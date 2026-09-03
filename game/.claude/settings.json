@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(flutter run -d chrome --no-hot --web-port=8765 2>&1)",
+      "PowerShell(flutter analyze lib/main.dart lib/image_sliding_puzzle.dart lib/sliding_puzzle.dart)"
+    ]
+  }
+}

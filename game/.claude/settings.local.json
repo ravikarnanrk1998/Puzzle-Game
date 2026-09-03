@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(flutter analyze lib/block_puzzle.dart)",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"assets\\\\sounds\" | Out-Null; if \\(-not \\(Test-Path \"assets\\\\sounds\\\\perfect_clear.mp3\"\\)\\) { New-Item -ItemType File -Path \"assets\\\\sounds\\\\perfect_clear.mp3\" | Out-Null }; Get-ChildItem assets\\\\sounds)",
+      "PowerShell(flutter pub get)",
+      "PowerShell(if \\(-not \\(Test-Path \"assets\\\\sounds\\\\line_clear.mp3\"\\)\\) { New-Item -ItemType File -Path \"assets\\\\sounds\\\\line_clear.mp3\" | Out-Null }; Get-ChildItem assets\\\\sounds)",
+      "PowerShell(flutter devices)",
+      "PowerShell(flutter analyze lib/main.dart lib/ui/glass_panel.dart lib/ui/ambient_background.dart)"
+    ]
+  }
+}
