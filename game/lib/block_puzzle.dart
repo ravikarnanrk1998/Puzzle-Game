@@ -13,46 +13,227 @@ class ShapeDef {
   ShapeDef(this.matrix, this.color);
 }
 
+const Color _cGold = Color(0xFFFFD700);
+const Color _cCyan = Color(0xFF00E5FF);
+const Color _cGreen = Color(0xFF00E676);
+const Color _cRed = Color(0xFFFF1744);
+const Color _cOrange = Color(0xFFFF9100);
+const Color _cPurple = Color(0xFFD500F9);
+const Color _cPink = Color(0xFFF50057);
+const Color _cBlue = Color(0xFF2979FF);
+const Color _cTeal = Color(0xFF00B8D4);
+const Color _cYellow = Color(0xFFFFEA00);
+const Color _cLime = Color(0xFF76FF03);
+const Color _cIndigo = Color(0xFF3D5AFE);
+const Color _cEmerald = Color(0xFF00C853);
+const Color _cDeepOrange = Color(0xFFFF6D00);
+const Color _cMagenta = Color(0xFFE040FB);
+const Color _cSky = Color(0xFF448AFF);
+
 final List<ShapeDef> _allShapes = [
+  // Single block
   ShapeDef([
     [true],
-  ], const Color(0xFFFFD700)),
+  ], _cGold),
+
+  // Dominoes
   ShapeDef([
     [true, true],
-  ], const Color(0xFF00E5FF)),
+  ], _cCyan),
   ShapeDef([
     [true],
     [true],
-  ], const Color(0xFF00E5FF)),
+  ], _cCyan),
+
+  // Straight lines (3, 4, 5 long)
   ShapeDef([
     [true, true, true],
-  ], const Color(0xFF00E676)),
+  ], _cGreen),
   ShapeDef([
     [true],
     [true],
     [true],
-  ], const Color(0xFF00E676)),
+  ], _cGreen),
+  ShapeDef([
+    [true, true, true, true],
+  ], _cBlue),
+  ShapeDef([
+    [true],
+    [true],
+    [true],
+    [true],
+  ], _cBlue),
+  ShapeDef([
+    [true, true, true, true, true],
+  ], _cTeal),
+  ShapeDef([
+    [true],
+    [true],
+    [true],
+    [true],
+    [true],
+  ], _cTeal),
+
+  // Squares
   ShapeDef([
     [true, true],
     [true, true],
-  ], const Color(0xFFFF1744)),
+  ], _cRed),
+  ShapeDef([
+    [true, true, true],
+    [true, true, true],
+    [true, true, true],
+  ], _cYellow),
+
+  // Rectangles (2x3 / 3x2)
+  ShapeDef([
+    [true, true, true],
+    [true, true, true],
+  ], _cSky),
+  ShapeDef([
+    [true, true],
+    [true, true],
+    [true, true],
+  ], _cSky),
+
+  // L-tromino (3-cell corner), all 4 rotations
   ShapeDef([
     [true, false],
     [true, true],
-  ], const Color(0xFFFF9100)),
+  ], _cOrange),
+  ShapeDef([
+    [true, true],
+    [true, false],
+  ], _cOrange),
   ShapeDef([
     [true, true],
     [false, true],
-  ], const Color(0xFFD500F9)),
+  ], _cOrange),
+  ShapeDef([
+    [false, true],
+    [true, true],
+  ], _cOrange),
+
+  // T-tetromino, all 4 rotations
   ShapeDef([
     [true, true, true],
     [false, true, false],
-  ], const Color(0xFFF50057)),
+  ], _cPurple),
+  ShapeDef([
+    [false, true, false],
+    [true, true, true],
+  ], _cPurple),
+  ShapeDef([
+    [true, false],
+    [true, true],
+    [true, false],
+  ], _cPurple),
+  ShapeDef([
+    [false, true],
+    [true, true],
+    [false, true],
+  ], _cPurple),
+
+  // S-tetromino, 2 orientations
+  ShapeDef([
+    [false, true, true],
+    [true, true, false],
+  ], _cLime),
+  ShapeDef([
+    [true, false],
+    [true, true],
+    [false, true],
+  ], _cLime),
+
+  // Z-tetromino, 2 orientations
+  ShapeDef([
+    [true, true, false],
+    [false, true, true],
+  ], _cPink),
+  ShapeDef([
+    [false, true],
+    [true, true],
+    [true, false],
+  ], _cPink),
+
+  // L-tetromino, all 4 rotations
+  ShapeDef([
+    [true, false],
+    [true, false],
+    [true, true],
+  ], _cIndigo),
+  ShapeDef([
+    [true, true, true],
+    [true, false, false],
+  ], _cIndigo),
+  ShapeDef([
+    [true, true],
+    [false, true],
+    [false, true],
+  ], _cIndigo),
+  ShapeDef([
+    [false, false, true],
+    [true, true, true],
+  ], _cIndigo),
+
+  // J-tetromino, all 4 rotations
+  ShapeDef([
+    [false, true],
+    [false, true],
+    [true, true],
+  ], _cEmerald),
+  ShapeDef([
+    [true, false, false],
+    [true, true, true],
+  ], _cEmerald),
+  ShapeDef([
+    [true, true],
+    [true, false],
+    [true, false],
+  ], _cEmerald),
+  ShapeDef([
+    [true, true, true],
+    [false, false, true],
+  ], _cEmerald),
+
+  // Big-L pentomino (thick corner), all 4 rotations
+  ShapeDef([
+    [true, false, false],
+    [true, false, false],
+    [true, true, true],
+  ], _cDeepOrange),
+  ShapeDef([
+    [true, true, true],
+    [true, false, false],
+    [true, false, false],
+  ], _cDeepOrange),
+  ShapeDef([
+    [true, true, true],
+    [false, false, true],
+    [false, false, true],
+  ], _cDeepOrange),
+  ShapeDef([
+    [false, false, true],
+    [false, false, true],
+    [true, true, true],
+  ], _cDeepOrange),
+
+  // Plus / cross
+  ShapeDef([
+    [false, true, false],
+    [true, true, true],
+    [false, true, false],
+  ], _cMagenta),
 ];
 
 class BlockPuzzlePage extends StatefulWidget {
   final bool isNewGame;
-  const BlockPuzzlePage({super.key, required this.isNewGame});
+  final int slotCount;
+  const BlockPuzzlePage({
+    super.key,
+    required this.isNewGame,
+    this.slotCount = 3,
+  });
 
   @override
   State<BlockPuzzlePage> createState() => _BlockPuzzlePageState();
@@ -63,6 +244,7 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
   late List<List<Color?>> board;
   late List<List<bool>> isClearing;
   List<ShapeDef?> availableShapes = [];
+  int slotCount = 3;
 
   int score = 0;
   int highScore = 0;
@@ -89,6 +271,7 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
       (_) => List.generate(boardSize, (_) => false),
     );
     if (widget.isNewGame) {
+      slotCount = widget.slotCount;
       _loadHighScoreOnly().then((_) => _initGame());
     } else {
       _loadGame();
@@ -112,6 +295,8 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
   Future<void> _loadGame() async {
     final prefs = await SharedPreferences.getInstance();
     highScore = prefs.getInt('block_high_score') ?? 0;
+
+    slotCount = prefs.getInt('block_saved_slot_count') ?? 3;
 
     String? boardStr = prefs.getString('block_saved_board');
     if (boardStr != null) {
@@ -154,6 +339,7 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
 
     prefs.setInt('block_saved_score', score);
     prefs.setInt('block_saved_hammers', hammers);
+    prefs.setInt('block_saved_slot_count', slotCount);
 
     if (score > highScore) {
       highScore = score;
@@ -187,7 +373,7 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
 
   void _generateShapes() {
     availableShapes = List.generate(
-      3,
+      slotCount,
       (_) => _allShapes[_random.nextInt(_allShapes.length)],
     );
     setState(() {});
@@ -265,7 +451,7 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
     if (rowsToClear.isNotEmpty || colsToClear.isNotEmpty) {
       _isAnimating = true;
       _lineClearPlayer
-          .play(AssetSource('sounds/line_clear.mp3'))
+          .play(AssetSource('sounds/line_clear.wav'))
           .catchError((_) {});
 
       setState(() {
@@ -444,29 +630,37 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
     );
   }
 
-  Widget _buildShapeCard(ShapeDef? shapeDef, int index) {
-    if (shapeDef == null) return const SizedBox(width: 90, height: 90);
+  Widget _buildShapeCard(
+    ShapeDef? shapeDef,
+    int index, {
+    double cardSize = 90,
+    double cellSize = 18,
+  }) {
+    if (shapeDef == null) return SizedBox(width: cardSize, height: cardSize);
 
     bool isDragging = draggingShapeIndex == index;
 
     Widget card = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(8),
+      padding: EdgeInsets.all(cardSize < 90 ? 5 : 8),
       alignment: Alignment.center,
-      constraints: const BoxConstraints(minWidth: 90, minHeight: 90),
+      constraints: BoxConstraints(minWidth: cardSize, minHeight: cardSize),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.4),
         border: Border.all(color: Colors.white12, width: 1),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: _buildShapeGrid(shapeDef),
+      child: _buildShapeGrid(shapeDef, cellSize: cellSize),
     );
 
     if (_isAnimating) return card;
 
+    final liftAboveFinger = shapeDef.matrix.length * 22.0 + 60.0;
+
     return Draggable<int>(
       data: index,
       dragAnchorStrategy: pointerDragAnchorStrategy,
+      feedbackOffset: Offset(0, -liftAboveFinger),
       feedback: Opacity(
         opacity: 0.85,
         child: Material(
@@ -527,7 +721,6 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
         children: [
           AmbientGlowBackground(
             gradientColors: const [Color(0xFF140D36), Color(0xFF2A0845)],
-            orbColors: const [Colors.cyanAccent, Colors.pinkAccent],
             child: SafeArea(
               child: Column(
                 children: [
@@ -695,7 +888,8 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
               ),
               const SizedBox(height: 10),
               Expanded(
-                child: Center(
+                child: Align(
+                  alignment: Alignment.topCenter,
                   child: AspectRatio(
                     aspectRatio: 1,
                     child: Container(
@@ -910,12 +1104,22 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
               ),
               Container(
                 height: 140,
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 6,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   crossAxisAlignment: CrossAxisAlignment.center,
-                  children: List.generate(3, (index) {
-                    return _buildShapeCard(availableShapes[index], index);
+                  children: List.generate(slotCount, (index) {
+                    final cardSize = slotCount <= 3 ? 90.0 : 58.0;
+                    final cellSize = slotCount <= 3 ? 18.0 : 9.0;
+                    return _buildShapeCard(
+                      availableShapes[index],
+                      index,
+                      cardSize: cardSize,
+                      cellSize: cellSize,
+                    );
                   }),
                 ),
               ),

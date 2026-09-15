@@ -116,7 +116,6 @@ class SnakeMapSelectPage extends StatelessWidget {
       ),
       body: AmbientGlowBackground(
         gradientColors: const [Color(0xFF0B1D26), Color(0xFF091420)],
-        orbColors: const [Colors.greenAccent, Colors.cyanAccent],
         child: SafeArea(
           child: GridView.builder(
             padding: const EdgeInsets.fromLTRB(20, 100, 20, 30),
@@ -286,7 +285,6 @@ class _SnakeSettingsPageState extends State<SnakeSettingsPage> {
       ),
       body: AmbientGlowBackground(
         gradientColors: const [Color(0xFF0B1D26), Color(0xFF091420)],
-        orbColors: const [Colors.greenAccent, Colors.cyanAccent],
         child: SafeArea(
           child: Center(
             child: Padding(
@@ -415,6 +413,7 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
   bool isReady = false;
   int speedLevel = 3;
   final Random _random = Random();
+  Offset _swipeAccum = Offset.zero;
 
   @override
   void initState() {
@@ -483,6 +482,27 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
       return;
     }
     pendingDirection = d;
+  }
+
+  void _onPanStart(DragStartDetails details) {
+    _swipeAccum = Offset.zero;
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    _swipeAccum += details.delta;
+    const threshold = 18.0;
+    if (_swipeAccum.dx.abs() > threshold || _swipeAccum.dy.abs() > threshold) {
+      if (_swipeAccum.dx.abs() > _swipeAccum.dy.abs()) {
+        _setDirection(
+          _swipeAccum.dx > 0 ? SnakeDirection.right : SnakeDirection.left,
+        );
+      } else {
+        _setDirection(
+          _swipeAccum.dy > 0 ? SnakeDirection.down : SnakeDirection.up,
+        );
+      }
+      _swipeAccum = Offset.zero;
+    }
   }
 
   void _tick() {
@@ -684,7 +704,6 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
     return Scaffold(
       body: AmbientGlowBackground(
         gradientColors: const [Color(0xFF0B1D26), Color(0xFF091420)],
-        orbColors: const [Colors.greenAccent, Colors.cyanAccent],
         child: SafeArea(
           child: Column(
             children: [
@@ -704,14 +723,29 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
                       borderRadius: BorderRadius.circular(16),
                       glowColor: Colors.greenAccent,
                       blur: 8,
-                      child: Text(
-                        'SCORE: $score',
-                        style: const TextStyle(
-                          color: Colors.greenAccent,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                          letterSpacing: 1,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'SCORE: $score',
+                            style: const TextStyle(
+                              color: Colors.greenAccent,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'BEST: $highScore',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Row(
@@ -736,52 +770,58 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
                     aspectRatio: kSnakeCols / kSnakeRows,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: GlassPanel(
-                        padding: const EdgeInsets.all(6),
-                        borderRadius: BorderRadius.circular(20),
-                        glowColor: Colors.greenAccent,
-                        blur: 6,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              CustomPaint(
-                                painter: _SnakeBoardPainter(
-                                  snake: snake,
-                                  food: food,
-                                  walls: widget.mapDef.walls,
-                                ),
-                              ),
-                              if (isPaused)
-                                Container(
-                                  color: Colors.black.withValues(alpha: 0.55),
-                                  alignment: Alignment.center,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text(
-                                        'PAUSED',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 26,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 3,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 14),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.play_circle_fill,
-                                          color: Colors.greenAccent,
-                                          size: 56,
-                                        ),
-                                        onPressed: _togglePause,
-                                      ),
-                                    ],
+                      child: GestureDetector(
+                        onPanStart: _onPanStart,
+                        onPanUpdate: _onPanUpdate,
+                        child: GlassPanel(
+                          padding: const EdgeInsets.all(6),
+                          borderRadius: BorderRadius.circular(20),
+                          glowColor: Colors.greenAccent,
+                          blur: 6,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                CustomPaint(
+                                  painter: _SnakeBoardPainter(
+                                    snake: snake,
+                                    food: food,
+                                    walls: widget.mapDef.walls,
                                   ),
                                 ),
-                            ],
+                                if (isPaused)
+                                  Container(
+                                    color: Colors.black.withValues(
+                                      alpha: 0.55,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text(
+                                          'PAUSED',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 26,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 3,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.play_circle_fill,
+                                            color: Colors.greenAccent,
+                                            size: 56,
+                                          ),
+                                          onPressed: _togglePause,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -789,8 +829,6 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              _buildDPad(),
               const SizedBox(height: 20),
             ],
           ),
@@ -812,38 +850,6 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
     );
   }
 
-  Widget _buildDPad() {
-    Widget arrowButton(IconData icon, SnakeDirection d) {
-      return GestureDetector(
-        onTap: () => _setDirection(d),
-        child: GlassPanel(
-          padding: const EdgeInsets.all(14),
-          borderRadius: BorderRadius.circular(16),
-          glowColor: Colors.cyanAccent,
-          blur: 8,
-          child: Icon(icon, color: Colors.white, size: 26),
-        ),
-      );
-    }
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        arrowButton(Icons.keyboard_arrow_up, SnakeDirection.up),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            arrowButton(Icons.keyboard_arrow_left, SnakeDirection.left),
-            const SizedBox(width: 60),
-            arrowButton(Icons.keyboard_arrow_right, SnakeDirection.right),
-          ],
-        ),
-        const SizedBox(height: 8),
-        arrowButton(Icons.keyboard_arrow_down, SnakeDirection.down),
-      ],
-    );
-  }
 }
 
 class _SnakeBoardPainter extends CustomPainter {

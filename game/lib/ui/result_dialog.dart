@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 class ResultStat {
@@ -7,7 +8,7 @@ class ResultStat {
   const ResultStat(this.label, this.value, {this.highlight = false});
 }
 
-class ResultDialog extends StatelessWidget {
+class ResultDialog extends StatefulWidget {
   final IconData icon;
   final Color accentColor;
   final String title;
@@ -30,7 +31,36 @@ class ResultDialog extends StatelessWidget {
   });
 
   @override
+  State<ResultDialog> createState() => _ResultDialogState();
+}
+
+class _ResultDialogState extends State<ResultDialog> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer
+        .play(AssetSource('sounds/perfect_clear.mp3'))
+        .catchError((_) {});
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final icon = widget.icon;
+    final accentColor = widget.accentColor;
+    final title = widget.title;
+    final stats = widget.stats;
+    final primaryLabel = widget.primaryLabel;
+    final onPrimary = widget.onPrimary;
+    final secondaryLabel = widget.secondaryLabel;
+    final onSecondary = widget.onSecondary;
     return Dialog(
       backgroundColor: Colors.transparent,
       child: TweenAnimationBuilder<double>(
@@ -44,8 +74,11 @@ class ResultDialog extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    accentColor.withValues(alpha: 0.28),
-                    Colors.black.withValues(alpha: 0.55),
+                    Color.alphaBlend(
+                      accentColor.withValues(alpha: 0.3),
+                      const Color(0xFF14161F),
+                    ),
+                    const Color(0xFF0A0C12),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -98,7 +131,7 @@ class ResultDialog extends StatelessWidget {
                       horizontal: 18,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.25),
+                      color: Colors.black.withValues(alpha: 0.35),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.1),

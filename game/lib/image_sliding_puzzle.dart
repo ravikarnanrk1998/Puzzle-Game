@@ -25,6 +25,8 @@ class _ImageSlidingPuzzlePageState extends State<ImageSlidingPuzzlePage> {
   int emptyIndex = 0;
   bool isReady = false;
   int moves = 0;
+  Offset _dragAccum = Offset.zero;
+  bool _dragTriggered = false;
 
   @override
   void initState() {
@@ -181,7 +183,6 @@ class _ImageSlidingPuzzlePageState extends State<ImageSlidingPuzzlePage> {
       ),
       body: AmbientGlowBackground(
         gradientColors: const [Color(0xFF0575E6), Color(0xFF021B79)],
-        orbColors: const [Colors.cyanAccent, Colors.pinkAccent],
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -190,21 +191,36 @@ class _ImageSlidingPuzzlePageState extends State<ImageSlidingPuzzlePage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    GlassPanel(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      blur: 10,
-                      child: Text(
-                        'Moves: $moves',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.cyanAccent,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.memory(
+                            imageBytes,
+                            width: 90,
+                            height: 90,
+                            fit: BoxFit.cover,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 14),
+                        GlassPanel(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          blur: 10,
+                          child: Text(
+                            'Moves: $moves',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.cyanAccent,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 30),
                     Container(
@@ -306,6 +322,17 @@ class _ImageSlidingPuzzlePageState extends State<ImageSlidingPuzzlePage> {
       height: cellSize,
       child: GestureDetector(
         onTap: () => _onTileTap(index),
+        onPanStart: (_) {
+          _dragAccum = Offset.zero;
+          _dragTriggered = false;
+        },
+        onPanUpdate: (details) {
+          _dragAccum += details.delta;
+          if (!_dragTriggered && _dragAccum.distance > 18) {
+            _dragTriggered = true;
+            _onTileTap(index);
+          }
+        },
         child: _buildTileFace(value, boardSize),
       ),
     );
