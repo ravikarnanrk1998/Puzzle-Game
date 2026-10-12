@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "780551930607",
+    "project_id": "bike-rush-f46df",
+    "storage_bucket": "bike-rush-f46df.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:780551930607:android:9f1ab85d035c57d3bf511a",
+        "android_client_info": {
+          "package_name": "com.ravikarnangame.bikerush"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "780551930607-4bnu4m0p61asthnlqba00ij73lbbmp23.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ravikarnangame.bikerush",
+            "certificate_hash": "f3e57855a24e6c31a3c2875932f41de2ad299caa"
+          }
+        },
+        {
+          "client_id": "780551930607-jbg8abio7uo8l5jns28bamk2ruoe4l9e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ravikarnangame.bikerush",
+            "certificate_hash": "b0f499381d2bc1d15e156f65b837a8910edff9f4"
+          }
+        },
+        {
+          "client_id": "780551930607-lnrlbjioom4pejf8knt9iq9g6b4kmobm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjpi8JbOMh6HDJo83uM5akH5IDiiKlxxk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "780551930607-lnrlbjioom4pejf8knt9iq9g6b4kmobm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

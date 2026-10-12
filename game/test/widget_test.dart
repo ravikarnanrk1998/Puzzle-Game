@@ -8,7 +8,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify that our main menu is present.
-    expect(find.text('PUZZLE HUB'), findsOneWidget);
+    expect(find.text('PUZZLE HUB', findRichText: true), findsOneWidget);
+    expect(find.text('STORE'), findsOneWidget);
 
     // Verify that both game options are present.
     expect(find.text('Sliding Puzzle'), findsOneWidget);

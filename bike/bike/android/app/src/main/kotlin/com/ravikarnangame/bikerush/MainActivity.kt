@@ -1,4 +1,4 @@
-package com.ravik.bikerush
+package com.ravikarnangame.bikerush
 
 import io.flutter.embedding.android.FlutterActivity
 

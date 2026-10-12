@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'store/store_page.dart';
+import 'store/store_service.dart';
 import 'ui/ambient_background.dart';
 import 'ui/glass_panel.dart';
 
@@ -14,15 +16,32 @@ class SnakeMapDef {
   final String id;
   final String name;
   final Set<Point<int>> walls;
-  final bool locked;
+  final bool premium;
 
   SnakeMapDef({
     required this.id,
     required this.name,
     required this.walls,
-    this.locked = false,
+    this.premium = false,
   });
+
+  bool get locked => premium && !StoreService.instance.isPremium;
 }
+
+Set<Point<int>> _hLine(int y, int x0, int x1) => {
+  for (int x = x0; x <= x1; x++) Point(x, y),
+};
+
+Set<Point<int>> _vLine(int x, int y0, int y1) => {
+  for (int y = y0; y <= y1; y++) Point(x, y),
+};
+
+Set<Point<int>> _ring(int x0, int y0, int x1, int y1) => {
+  ..._hLine(y0, x0, x1),
+  ..._hLine(y1, x0, x1),
+  ..._vLine(x0, y0, y1),
+  ..._vLine(x1, y0, y1),
+};
 
 Set<Point<int>> _bordersWalls() {
   final walls = <Point<int>>{};
@@ -71,19 +90,96 @@ Set<Point<int>> _crossingWalls() {
   return walls;
 }
 
+/// A solid frame around the whole board: no wrapping through the edges.
+Set<Point<int>> _outriWalls() => _ring(0, 0, kSnakeCols - 1, kSnakeRows - 1);
+
+/// Two bars like an equals sign.
+Set<Point<int>> _meqWalls() => {..._hLine(6, 3, 9), ..._hLine(12, 3, 9)};
+
+/// Two full-height columns, each with a gap in the middle.
+Set<Point<int>> _beltlingWalls() {
+  final midY = kSnakeRows ~/ 2;
+  return {..._vLine(3, 0, kSnakeRows - 1), ..._vLine(9, 0, kSnakeRows - 1)}
+    ..removeWhere((p) => (p.y - midY).abs() <= 1);
+}
+
+/// Two nested frames with doorways on every side.
+Set<Point<int>> _echoWalls() {
+  final midX = kSnakeCols ~/ 2;
+  final midY = kSnakeRows ~/ 2;
+  return {..._ring(2, 2, 10, 16), ..._ring(4, 6, 8, 12)}..removeAll([
+    Point(midX, 2),
+    Point(midX, 16),
+    Point(2, midY),
+    Point(10, midY),
+    Point(4, midY),
+    Point(8, midY),
+  ]);
+}
+
+/// A grid of 2x2 pillars.
+Set<Point<int>> _seekWalls() => {
+  for (final x in [2, 6, 10])
+    for (final y in [3, 8, 13])
+      for (int dx = 0; dx < 2; dx++)
+        for (int dy = 0; dy < 2; dy++) Point(x + dx, y + dy),
+};
+
+/// Solid side walls (only top/bottom wrap) and a bar across the middle.
+Set<Point<int>> _frontierWalls() => {
+  ..._vLine(0, 0, kSnakeRows - 1),
+  ..._vLine(kSnakeCols - 1, 0, kSnakeRows - 1),
+  ..._hLine(kSnakeRows ~/ 2, 4, 8),
+};
+
+/// Four diagonals pointing in from the corners.
+Set<Point<int>> _frenzyWalls() => {
+  for (int i = 0; i < 4; i++) ...[
+    Point(2 + i, 3 + i),
+    Point(10 - i, 3 + i),
+    Point(2 + i, 15 - i),
+    Point(10 - i, 15 - i),
+  ],
+};
+
+/// Stacked bars that leave narrow alleys, open at both sides.
+Set<Point<int>> _alleysWalls() => {
+  for (final y in [3, 6, 9, 12, 15]) ..._hLine(y, 2, 10),
+};
+
 final List<SnakeMapDef> kSnakeMaps = [
   SnakeMapDef(id: 'classic', name: 'Classic', walls: {}),
   SnakeMapDef(id: 'borders', name: 'Borders', walls: _bordersWalls()),
   SnakeMapDef(id: 'maze', name: 'Maze', walls: _mazeWalls()),
   SnakeMapDef(id: 'crossing', name: 'Crossing', walls: _crossingWalls()),
-  SnakeMapDef(id: 'outri', name: 'Outri', walls: {}, locked: true),
-  SnakeMapDef(id: 'meq', name: 'Meq', walls: {}, locked: true),
-  SnakeMapDef(id: 'beltling', name: 'Beltling', walls: {}, locked: true),
-  SnakeMapDef(id: 'echo', name: 'Echo', walls: {}, locked: true),
-  SnakeMapDef(id: 'seek', name: 'Seek', walls: {}, locked: true),
-  SnakeMapDef(id: 'frontier', name: 'Frontier', walls: {}, locked: true),
-  SnakeMapDef(id: 'frenzy', name: 'Frenzy', walls: {}, locked: true),
-  SnakeMapDef(id: 'alleys', name: 'Alleys', walls: {}, locked: true),
+  SnakeMapDef(id: 'outri', name: 'Outri', walls: _outriWalls(), premium: true),
+  SnakeMapDef(id: 'meq', name: 'Meq', walls: _meqWalls(), premium: true),
+  SnakeMapDef(
+    id: 'beltling',
+    name: 'Beltling',
+    walls: _beltlingWalls(),
+    premium: true,
+  ),
+  SnakeMapDef(id: 'echo', name: 'Echo', walls: _echoWalls(), premium: true),
+  SnakeMapDef(id: 'seek', name: 'Seek', walls: _seekWalls(), premium: true),
+  SnakeMapDef(
+    id: 'frontier',
+    name: 'Frontier',
+    walls: _frontierWalls(),
+    premium: true,
+  ),
+  SnakeMapDef(
+    id: 'frenzy',
+    name: 'Frenzy',
+    walls: _frenzyWalls(),
+    premium: true,
+  ),
+  SnakeMapDef(
+    id: 'alleys',
+    name: 'Alleys',
+    walls: _alleysWalls(),
+    premium: true,
+  ),
 ];
 
 class SnakeMapSelectPage extends StatelessWidget {
@@ -117,16 +213,20 @@ class SnakeMapSelectPage extends StatelessWidget {
       body: AmbientGlowBackground(
         gradientColors: const [Color(0xFF0B1D26), Color(0xFF091420)],
         child: SafeArea(
-          child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(20, 100, 20, 30),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 14,
-              mainAxisSpacing: 14,
-              childAspectRatio: 0.85,
+          child: ListenableBuilder(
+            listenable: StoreService.instance,
+            builder: (context, _) => GridView.builder(
+              padding: const EdgeInsets.fromLTRB(20, 100, 20, 30),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+                childAspectRatio: 0.85,
+              ),
+              itemCount: kSnakeMaps.length,
+              itemBuilder: (context, index) =>
+                  _MapTile(mapDef: kSnakeMaps[index]),
             ),
-            itemCount: kSnakeMaps.length,
-            itemBuilder: (context, index) => _MapTile(mapDef: kSnakeMaps[index]),
           ),
         ),
       ),
@@ -141,22 +241,18 @@ class _MapTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: mapDef.locked
-          ? () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Coming soon!')),
-              );
-            }
-          : () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SnakeGamePage(mapDef: mapDef),
-                ),
-              );
-            },
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => mapDef.locked
+                ? const StorePage()
+                : SnakeGamePage(mapDef: mapDef),
+          ),
+        );
+      },
       child: Opacity(
-        opacity: mapDef.locked ? 0.45 : 1.0,
+        opacity: mapDef.locked ? 0.6 : 1.0,
         child: GlassPanel(
           padding: const EdgeInsets.all(10),
           borderRadius: BorderRadius.circular(18),
@@ -187,11 +283,15 @@ class _MapTile extends StatelessWidget {
                   ),
                 ],
               ),
-              if (mapDef.locked)
-                const Positioned(
+              if (mapDef.premium)
+                Positioned(
                   top: 0,
                   right: 0,
-                  child: Icon(Icons.lock, color: Colors.white70, size: 14),
+                  child: Icon(
+                    mapDef.locked ? Icons.lock : Icons.workspace_premium,
+                    color: mapDef.locked ? Colors.white70 : Colors.amberAccent,
+                    size: 14,
+                  ),
                 ),
             ],
           ),

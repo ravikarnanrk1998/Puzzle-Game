@@ -32,7 +32,7 @@ class StoreService extends ChangeNotifier {
       StreamController<String>.broadcast();
   StreamSubscription<List<PurchaseDetails>>? _sub;
 
-  /// Short messages for the UI ("Purchase cancelled", "+2,000 coins!", ...).
+  /// Short messages for the UI ("Purchase cancelled", "+10,000 coins!", ...).
   Stream<String> get messages => _messages.stream;
 
   InAppPurchase get _iap => InAppPurchase.instance;

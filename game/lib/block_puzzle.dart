@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'store/store_page.dart';
+import 'store/store_service.dart';
 import 'ui/ambient_background.dart';
 import 'ui/glass_panel.dart';
 import 'ui/result_dialog.dart';
@@ -248,6 +250,7 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
 
   int score = 0;
   int highScore = 0;
+  // Free hammers left this game; purchased ones live in StoreService.
   int hammers = 3;
   bool isEraserSelected = false;
   bool _isAnimating = false;
@@ -362,7 +365,7 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
       (_) => List.generate(boardSize, (_) => false),
     );
     score = 0;
-    hammers = 3;
+    hammers = StoreService.instance.freeHammersPerGame;
     isEraserSelected = false;
     _isAnimating = false;
     _generateShapes();
@@ -537,16 +540,32 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
     });
   }
 
+  int get _totalHammers => hammers + StoreService.instance.hammers;
+
   void _useEraser(int r, int c) {
+    if (_isAnimating || board[r][c] == null) return;
+    if (hammers > 0) {
+      hammers--;
+    } else if (!StoreService.instance.useHammer()) {
+      return;
+    }
+    setState(() {
+      board[r][c] = null;
+      isEraserSelected = false;
+    });
+    _saveGame();
+    _checkGameOver();
+  }
+
+  void _onHammerTap() {
     if (_isAnimating) return;
-    if (hammers > 0 && board[r][c] != null) {
-      setState(() {
-        board[r][c] = null;
-        hammers--;
-        isEraserSelected = false;
-      });
-      _saveGame();
-      _checkGameOver();
+    if (_totalHammers > 0) {
+      setState(() => isEraserSelected = !isEraserSelected);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StorePage()),
+      );
     }
   }
 
@@ -783,68 +802,70 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
                     ),
                     Column(
                       children: [
-                        GestureDetector(
-                          onTap: () {
-                            if (hammers > 0 && !_isAnimating) {
-                              setState(() {
-                                isEraserSelected = !isEraserSelected;
-                              });
-                            }
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isEraserSelected
-                                  ? Colors.cyanAccent
-                                  : Colors.black45,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isEraserSelected
-                                    ? Colors.white
-                                    : Colors.cyanAccent,
-                                width: 2,
+                        ListenableBuilder(
+                          listenable: StoreService.instance,
+                          builder: (context, _) => GestureDetector(
+                            onTap: _onHammerTap,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
                               ),
-                              boxShadow: isEraserSelected
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.cyanAccent.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                        blurRadius: 10,
-                                        spreadRadius: 2,
-                                      ),
-                                    ]
-                                  : [],
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.build,
+                              decoration: BoxDecoration(
+                                color: isEraserSelected
+                                    ? Colors.cyanAccent
+                                    : Colors.black45,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
                                   color: isEraserSelected
-                                      ? Colors.black
-                                      : (hammers > 0
-                                            ? Colors.cyanAccent
-                                            : Colors.grey),
-                                  size: 20,
+                                      ? Colors.white
+                                      : Colors.cyanAccent,
+                                  width: 2,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '$hammers',
-                                  style: TextStyle(
+                                boxShadow: isEraserSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.cyanAccent.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                          blurRadius: 10,
+                                          spreadRadius: 2,
+                                        ),
+                                      ]
+                                    : [],
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.build,
                                     color: isEraserSelected
                                         ? Colors.black
-                                        : (hammers > 0
-                                              ? Colors.white
+                                        : (_totalHammers > 0
+                                              ? Colors.cyanAccent
                                               : Colors.grey),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                                    size: 20,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 8),
+                                  if (_totalHammers > 0)
+                                    Text(
+                                      '$_totalHammers',
+                                      style: TextStyle(
+                                        color: isEraserSelected
+                                            ? Colors.black
+                                            : Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    )
+                                  else
+                                    const Icon(
+                                      Icons.add_circle,
+                                      color: Colors.amberAccent,
+                                      size: 20,
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
                         ),

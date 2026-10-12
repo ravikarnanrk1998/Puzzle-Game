@@ -59,21 +59,21 @@ class Catalog {
       name: 'Blue Bolt',
       color: Color(0xFF1E88E5),
       accent: Color(0xFFBBDEFB),
-      coinPrice: 500,
+      coinPrice: 5000,
     ),
     BikeSkin(
       id: 'sun',
       name: 'Sunburst',
       color: Color(0xFFFFB300),
       accent: Color(0xFFFFF8E1),
-      coinPrice: 1200,
+      coinPrice: 50000,
     ),
     BikeSkin(
       id: 'purple',
       name: 'Purple Phantom',
       color: Color(0xFF8E24AA),
       accent: Color(0xFFE1BEE7),
-      coinPrice: 2500,
+      coinPrice: 100000,
       perk: 'Starts with 60% nitro',
       startNitro: 0.6,
     ),
@@ -82,7 +82,7 @@ class Catalog {
       name: 'Aqua Racer',
       color: Color(0xFF00ACC1),
       accent: Color(0xFFE0F7FA),
-      coinPrice: 4000,
+      coinPrice: 500000,
       perk: 'Starts with 4 lives',
       startLives: 4,
     ),
@@ -112,9 +112,9 @@ class Catalog {
   ];
 
   static const List<CoinPack> coinPacks = [
-    CoinPack('coins_small', 2000),
-    CoinPack('coins_medium', 6000, badge: 'POPULAR'),
-    CoinPack('coins_large', 15000, badge: 'BEST VALUE'),
+    CoinPack('coins_small', 10000),
+    CoinPack('coins_medium', 30000, badge: 'POPULAR'),
+    CoinPack('coins_large', 80000, badge: 'BEST VALUE'),
   ];
 
   static Set<String> get productIds => {

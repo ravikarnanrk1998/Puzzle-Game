@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../account/account_service.dart';
+import '../audio/game_music.dart';
 import '../game/bike_game.dart';
 import '../game/game_painter.dart';
 import '../shop/player_progress.dart';
@@ -10,10 +12,22 @@ import 'overlays.dart';
 import 'shop_screen.dart';
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.progress, required this.store});
+  const GameScreen({
+    super.key,
+    required this.progress,
+    required this.store,
+    this.music,
+    this.account,
+  });
 
   final PlayerProgress progress;
   final StoreService store;
+
+  /// Null means no music (tests).
+  final GameMusic? music;
+
+  /// Null means the game is running without accounts.
+  final AccountService? account;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -25,6 +39,7 @@ class _GameScreenState extends State<GameScreen>
   final FocusNode _focus = FocusNode();
   late final Ticker _ticker;
   Duration _last = Duration.zero;
+  bool _foreground = true;
 
   @override
   void initState() {
@@ -32,6 +47,7 @@ class _GameScreenState extends State<GameScreen>
     WidgetsBinding.instance.addObserver(this);
     _game.bike = widget.progress.selectedBike;
     widget.progress.addListener(_syncBike);
+    _game.addListener(_syncMusic);
     _game.onGameOver = _bankRun;
     _game.onImpact = (heavy) =>
         heavy ? HapticFeedback.heavyImpact() : HapticFeedback.mediumImpact();
@@ -50,7 +66,17 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) _game.pause();
+    _foreground = state == AppLifecycleState.resumed;
+    if (!_foreground) _game.pause();
+    _syncMusic();
+  }
+
+  /// Music plays only while riding, and never with the app in the background
+  /// (a crash in progress is not paused, so the phase alone is not enough).
+  void _syncMusic() {
+    final phase = _game.phase;
+    widget.music?.setPlaying(_foreground &&
+        (phase == GamePhase.playing || phase == GamePhase.crashing));
   }
 
   void _onTick(Duration elapsed) {
@@ -101,6 +127,37 @@ class _GameScreenState extends State<GameScreen>
       ),
     ));
     _focus.requestFocus();
+  }
+
+  Future<void> _openAccount() async {
+    final account = widget.account!;
+    final signOut = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Your account'),
+        content: Text(
+          '${account.name ?? 'Signed in'}\n\n'
+          'Your coins, bikes and best score are saved to this account. '
+          'Sign in again on any phone to get them back.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('SIGN OUT'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    if (signOut ?? false) {
+      // Signing out replaces this screen with the login screen.
+      await account.signOut();
+    } else {
+      _focus.requestFocus();
+    }
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
@@ -185,6 +242,8 @@ class _GameScreenState extends State<GameScreen>
           progress: widget.progress,
           onPlay: _start,
           onShop: _openShop,
+          accountName: widget.account?.name,
+          onAccount: widget.account == null ? null : _openAccount,
         );
       case GamePhase.playing:
       case GamePhase.crashing:

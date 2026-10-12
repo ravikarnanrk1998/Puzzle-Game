@@ -9,9 +9,14 @@ import 'snake_game.dart';
 import 'classic_block_puzzle.dart';
 import 'sudoku_game.dart';
 import 'jigsaw_puzzle.dart';
+import 'store/store_page.dart';
+import 'store/store_service.dart';
 import 'ui/ambient_background.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await StoreService.instance.loadLocal();
+  StoreService.instance.connect();
   runApp(const PuzzleApp());
 }
 
@@ -541,9 +546,67 @@ class _MainMenuPageState extends State<MainMenuPage>
                 ],
               ),
             ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: _buildStoreButton(),
+                ),
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildStoreButton() {
+    return ListenableBuilder(
+      listenable: StoreService.instance,
+      builder: (context, _) {
+        final premium = StoreService.instance.isPremium;
+        return GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const StorePage()),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                colors: [Colors.orangeAccent, Colors.pinkAccent],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.pinkAccent.withValues(alpha: 0.45),
+                  blurRadius: 14,
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  premium ? Icons.workspace_premium : Icons.storefront,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'STORE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

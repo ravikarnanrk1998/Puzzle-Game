@@ -510,12 +510,19 @@ class MenuOverlay extends StatelessWidget {
     required this.progress,
     required this.onPlay,
     required this.onShop,
+    this.accountName,
+    this.onAccount,
   });
 
   final BikeGame game;
   final PlayerProgress progress;
   final VoidCallback onPlay;
   final VoidCallback onShop;
+
+  /// The signed-in player. The account button is hidden when [onAccount]
+  /// is null (the game is running without accounts).
+  final String? accountName;
+  final VoidCallback? onAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -538,7 +545,7 @@ class MenuOverlay extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const _Title(),
+                    const GameTitle(),
                     const SizedBox(height: 6),
                     const Text(
                       'Dodge traffic • Grab coins • Fire the NITRO',
@@ -598,6 +605,12 @@ class MenuOverlay extends StatelessWidget {
               child: WalletChip(
                   coins: progress.wallet, doubled: progress.doubleCoins),
             ),
+            if (onAccount != null)
+              Positioned(
+                top: 10,
+                left: 10,
+                child: _AccountChip(name: accountName, onTap: onAccount!),
+              ),
           ],
         ),
       ),
@@ -605,8 +618,40 @@ class MenuOverlay extends StatelessWidget {
   }
 }
 
-class _Title extends StatelessWidget {
-  const _Title();
+class _AccountChip extends StatelessWidget {
+  const _AccountChip({required this.name, required this.onTap});
+
+  final String? name;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: _Chip(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.account_circle, color: Colors.white, size: 22),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: Text(
+                name ?? 'Account',
+                overflow: TextOverflow.ellipsis,
+                style: _smallStyle,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The game's logo, shown on the menu and the login screen.
+class GameTitle extends StatelessWidget {
+  const GameTitle({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'store/store_page.dart';
+import 'store/store_service.dart';
 import 'ui/ambient_background.dart';
 import 'ui/glass_panel.dart';
 import 'ui/result_dialog.dart';
@@ -300,8 +302,11 @@ class _SudokuGamePageState extends State<SudokuGamePage> {
   int? selectedRow;
   int? selectedCol;
   int mistakes = 0;
+  // Free hints left this puzzle; purchased ones live in StoreService.
+  int freeHints = 0;
   int elapsedSeconds = 0;
   int? bestSeconds;
+  final Random _random = Random();
   Timer? _timer;
   Timer? _revealTimer;
   int _revealCount = 0;
@@ -353,6 +358,7 @@ class _SudokuGamePageState extends State<SudokuGamePage> {
     puzzle = generated.puzzle;
     board = puzzle.map((row) => List<int>.from(row)).toList();
     mistakes = 0;
+    freeHints = StoreService.instance.freeHintsPerPuzzle;
     elapsedSeconds = 0;
     selectedRow = null;
     selectedCol = null;
@@ -428,6 +434,43 @@ class _SudokuGamePageState extends State<SudokuGamePage> {
     final c = selectedCol!;
     if (_isClue(r, c)) return;
     setState(() => board[r][c] = 0);
+  }
+
+  int get _totalHints => freeHints + StoreService.instance.hints;
+
+  /// Fills the selected cell with its answer, or a random unsolved cell if
+  /// the selection is already correct.
+  void _useHint() {
+    if (_totalHints == 0) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StorePage()),
+      );
+      return;
+    }
+
+    final unsolved = [
+      for (int r = 0; r < widget.size; r++)
+        for (int c = 0; c < widget.size; c++)
+          if (board[r][c] != solution[r][c]) (r, c),
+    ];
+    if (unsolved.isEmpty) return;
+    final selected = (selectedRow, selectedCol);
+    final (r, c) = selected is (int, int) && unsolved.contains(selected)
+        ? selected
+        : unsolved[_random.nextInt(unsolved.length)];
+
+    if (freeHints > 0) {
+      freeHints--;
+    } else if (!StoreService.instance.useHint()) {
+      return;
+    }
+    setState(() {
+      board[r][c] = solution[r][c];
+      selectedRow = r;
+      selectedCol = c;
+    });
+    _checkWin();
   }
 
   void _checkWin() {
@@ -711,6 +754,33 @@ class _SudokuGamePageState extends State<SudokuGamePage> {
               width: 20,
               height: 20,
               child: Icon(Icons.backspace_outlined, color: Colors.pinkAccent, size: 20),
+            ),
+          ),
+        ),
+        ListenableBuilder(
+          listenable: StoreService.instance,
+          builder: (context, _) => GestureDetector(
+            onTap: _useHint,
+            child: GlassPanel(
+              padding: const EdgeInsets.all(14),
+              borderRadius: BorderRadius.circular(12),
+              glowColor: Colors.amberAccent,
+              blur: 6,
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: Badge(
+                  label: Text(_totalHints > 0 ? '$_totalHints' : '+'),
+                  backgroundColor: Colors.amberAccent,
+                  textColor: Colors.black,
+                  offset: const Offset(10, -10),
+                  child: const Icon(
+                    Icons.lightbulb,
+                    color: Colors.amberAccent,
+                    size: 20,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
