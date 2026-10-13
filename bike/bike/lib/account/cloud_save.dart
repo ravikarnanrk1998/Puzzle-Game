@@ -23,6 +23,10 @@ abstract class SaveBackend {
 
   /// Completes once everything written so far has reached the server.
   Future<void> flush();
+
+  /// Deletes the save of account [uid]. Completes once the server has
+  /// done it.
+  Future<void> delete(String uid);
 }
 
 /// Keeps [PlayerProgress] and the signed-in player's cloud save in step, so
@@ -78,6 +82,18 @@ class CloudSave {
 
   /// Waits until the changes made so far have reached the server.
   Future<void> flush() => _backend.flush();
+
+  /// Deletes the signed-in player's save from the cloud, for good.
+  ///
+  /// Syncing stops first, or this device would send its copy straight back.
+  /// That copy is left alone here: [detach] clears it once the account is
+  /// gone, and [attach] puts the cloud save back if it turns out it isn't.
+  Future<void> erase() async {
+    final uid = _uid;
+    if (uid == null) return;
+    _stop();
+    await _backend.delete(uid).timeout(const Duration(seconds: 20));
+  }
 
   void _stop() {
     _sub?.cancel();
@@ -148,14 +164,16 @@ class FirestoreSaves implements SaveBackend {
     int number(Object? v) => v is num ? v.toInt() : 0;
     List<String> strings(Object? v) =>
         v is List ? v.whereType<String>().toList() : const [];
-    final selected = doc['selected'];
+    final selected = doc['selected'], dailyClaim = doc['dailyClaim'];
     return SaveData(
       wallet: number(doc['wallet']),
+      diamonds: number(doc['diamonds']),
       best: number(doc['best']),
       doubleCoins: doc['doubleCoins'] == true,
       owned: strings(doc['owned']).toSet(),
       selected: selected is String ? selected : null,
       delivered: strings(doc['delivered']),
+      dailyClaim: dailyClaim is String ? dailyClaim : null,
     );
   }
 
@@ -165,6 +183,9 @@ class FirestoreSaves implements SaveBackend {
     // only completes once it has been sent.
     _doc(uid).set({
       if (delta.coins != 0) 'wallet': FieldValue.increment(delta.coins),
+      if (delta.diamonds != 0)
+        'diamonds': FieldValue.increment(delta.diamonds),
+      if (delta.dailyClaim != null) 'dailyClaim': delta.dailyClaim,
       if (delta.best != null) 'best': delta.best,
       if (delta.doubleCoins) 'doubleCoins': true,
       if (delta.bikes.isNotEmpty)
@@ -179,4 +200,7 @@ class FirestoreSaves implements SaveBackend {
 
   @override
   Future<void> flush() => FirebaseFirestore.instance.waitForPendingWrites();
+
+  @override
+  Future<void> delete(String uid) => _doc(uid).delete();
 }

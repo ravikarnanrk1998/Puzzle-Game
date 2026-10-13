@@ -1,10 +1,12 @@
 import 'dart:math';
 
 import 'package:bike/game/bike_game.dart';
+import 'package:bike/game/game_painter.dart';
 import 'package:bike/main.dart';
 import 'package:bike/shop/catalog.dart';
 import 'package:bike/shop/player_progress.dart';
 import 'package:bike/shop/store_service.dart';
+import 'package:bike/ui/game_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -167,6 +169,27 @@ void main() {
       expect(p.buyWithCoins(Catalog.bike('gold')), isFalse,
           reason: 'premium bikes need real money');
     });
+
+    test('the free diamond can be claimed once a day', () {
+      final p = PlayerProgress.memory();
+      final morning = DateTime(2026, 10, 12, 9);
+      expect(p.canClaimDaily(morning), isTrue);
+      expect(p.claimDaily(morning), isTrue);
+      expect(p.diamonds, 1);
+      expect(p.claimDaily(DateTime(2026, 10, 12, 23, 59)), isFalse,
+          reason: 'still the same day');
+      expect(p.diamonds, 1);
+      expect(p.claimDaily(DateTime(2026, 10, 13, 0, 5)), isTrue);
+      expect(p.diamonds, 2);
+    });
+
+    test('diamonds can only be spent by a player who has them', () {
+      final p = PlayerProgress.memory();
+      expect(p.spendDiamonds(1), isFalse);
+      p.addDiamonds(10);
+      expect(p.spendDiamonds(1), isTrue);
+      expect(p.diamonds, 9);
+    });
   });
 
   group('StoreService', () {
@@ -179,6 +202,18 @@ void main() {
       expect(p.wallet, Catalog.coinPack('coins_small')!.coins);
       await store.handlePurchases([purchase('coins_small', 'GPA.2')]);
       expect(p.wallet, 2 * Catalog.coinPack('coins_small')!.coins);
+    });
+
+    test('diamond packs are credited once per order', () async {
+      final p = PlayerProgress.memory();
+      final store = StoreService(p, enabled: false);
+      final order = purchase('diamonds_20', 'GPA.5');
+      await store.handlePurchases([order]);
+      await store.handlePurchases([order]);
+      expect(p.diamonds, 20);
+      expect(p.wallet, 0);
+      expect(Catalog.diamondPacks.map((pack) => pack.diamonds),
+          [1, 10, 20, 50, 100]);
     });
 
     test('premium purchases unlock bikes and double coins', () async {
@@ -203,6 +238,38 @@ void main() {
     await tester.tap(find.text('PLAY'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('SCORE'), findsOneWidget);
+  });
+
+  testWidgets('lanes change by tapping a side or by swiping', (tester) async {
+    final progress = PlayerProgress.memory();
+    await tester.pumpWidget(BikeRushApp(
+      progress: progress,
+      store: StoreService(progress, enabled: false),
+    ));
+    await tester.tap(find.text('PLAY'));
+    await tester.pump(const Duration(milliseconds: 100));
+    final road = tester.widget<CustomPaint>(find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is GamePainter));
+    final game = (road.painter! as GamePainter).game;
+    final screen = tester.getSize(find.byType(GameScreen));
+    final left = Offset(screen.width * 0.25, screen.height / 2);
+    final right = Offset(screen.width * 0.75, screen.height / 2);
+    expect(game.targetLane, 1);
+
+    await tester.tapAt(right);
+    expect(game.targetLane, 2);
+    await tester.tapAt(left);
+    expect(game.targetLane, 1);
+
+    // A swipe goes the way it points, whichever side it starts on, and
+    // moves one lane only.
+    await tester.dragFrom(right, const Offset(-120, 0));
+    expect(game.targetLane, 0);
+    await tester.dragFrom(left, const Offset(120, 10));
+    expect(game.targetLane, 1);
+
+    await tester.dragFrom(right, const Offset(5, -120));
+    expect(game.targetLane, 1, reason: 'swiping up is not a lane change');
   });
 
   testWidgets('GARAGE opens the shop', (tester) async {

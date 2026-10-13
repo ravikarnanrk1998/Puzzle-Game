@@ -46,6 +46,9 @@ class AccountService extends ChangeNotifier {
     'account-exists-with-different-credential':
         'That email is already used with another sign-in method.',
     'operation-not-allowed': 'This sign-in method is not switched on yet.',
+    'user-mismatch':
+        'That is a different account. Choose the one you are signed in with.',
+    'requires-recent-login': 'Please log out, sign in again and try once more.',
     'network-request-failed': 'No internet connection. Please try again.',
     'too-many-requests': 'Too many attempts. Please wait and try again.',
   };
@@ -58,6 +61,9 @@ class AccountService extends ChangeNotifier {
   /// Their email address (or name), for display.
   String? name;
 
+  /// True if they sign in with a password rather than through Google.
+  bool usesPassword = false;
+
   /// True while the save of a player who just signed in is being fetched.
   bool loading = false;
 
@@ -65,6 +71,13 @@ class AccountService extends ChangeNotifier {
   StreamSubscription<User?>? _sub;
 
   bool get signedIn => uid != null;
+
+  /// What other players see this player called: the part of the email
+  /// before the @, never the whole address.
+  String get playerName {
+    final short = (name ?? '').split('@').first.trim();
+    return short.isEmpty ? 'Player' : short;
+  }
 
   FirebaseAuth get _auth => FirebaseAuth.instance;
 
@@ -75,8 +88,12 @@ class AccountService extends ChangeNotifier {
     _sub = _auth.authStateChanges().listen(_onUser);
   }
 
-  void _onUser(User? user) =>
-      handleUser(user?.uid, name: user?.email ?? user?.displayName);
+  void _onUser(User? user) {
+    usesPassword = user != null &&
+        !user.providerData
+            .any((p) => p.providerId == GoogleAuthProvider.PROVIDER_ID);
+    handleUser(user?.uid, name: user?.email ?? user?.displayName);
+  }
 
   @visibleForTesting
   void handleUser(String? newUid, {String? name}) {
@@ -97,13 +114,17 @@ class AccountService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> signInWithGoogle() => _attempt(() async {
-        await (_googleReady ??= GoogleSignIn.instance.initialize());
-        final account = await GoogleSignIn.instance.authenticate();
-        await _auth.signInWithCredential(GoogleAuthProvider.credential(
-          idToken: account.authentication.idToken,
-        ));
-      });
+  /// Asks the player to pick their Google account.
+  Future<AuthCredential> _googleCredential() async {
+    await (_googleReady ??= GoogleSignIn.instance.initialize());
+    final account = await GoogleSignIn.instance.authenticate();
+    return GoogleAuthProvider.credential(
+      idToken: account.authentication.idToken,
+    );
+  }
+
+  Future<String?> signInWithGoogle() => _attempt(
+      () async => _auth.signInWithCredential(await _googleCredential()));
 
   Future<String?> signInWithEmail(String email, String password) => _attempt(
       () => _auth.signInWithEmailAndPassword(email: email, password: password));
@@ -136,6 +157,36 @@ class AccountService extends ChangeNotifier {
     }
   }
 
+  /// Deletes the player's cloud save and then the account itself. Returns
+  /// null if it worked, otherwise a message to show the player.
+  ///
+  /// Firebase only deletes an account straight after a sign-in, so the
+  /// player first proves who they are: with [password], or through Google.
+  Future<String?> deleteAccount({String? password}) => _attempt(() async {
+        final user = _auth.currentUser!;
+        final viaGoogle = !usesPassword;
+        await user.reauthenticateWithCredential(viaGoogle
+            ? await _googleCredential()
+            : EmailAuthProvider.credential(
+                email: user.email!, password: password ?? ''));
+        try {
+          await cloud.erase();
+          await user.delete();
+        } catch (_) {
+          // Not deleted after all. Syncing again also puts the cloud save
+          // back, if that half had already gone through.
+          unawaited(cloud.attach(user.uid));
+          rethrow;
+        }
+        if (!viaGoogle) return;
+        try {
+          // Also withdraws the permission the game had on the Google account.
+          await GoogleSignIn.instance.disconnect();
+        } catch (e) {
+          debugPrint('Google disconnect failed: $e');
+        }
+      });
+
   /// Runs one sign-in step. Returns null if it worked, otherwise a message
   /// to show the player.
   Future<String?> _attempt(Future<void> Function() step) async {
@@ -145,12 +196,19 @@ class AccountService extends ChangeNotifier {
       _onUser(_auth.currentUser);
       return null;
     } on GoogleSignInException catch (e) {
-      // Note for setup: a missing SHA-1 fingerprint in the Firebase console
-      // is also reported as "canceled".
       debugPrint('Google sign-in failed: $e');
-      return e.code == GoogleSignInExceptionCode.canceled
-          ? 'Google sign-in was cancelled.'
-          : 'Google sign-in is not available right now.';
+      if (e.code != GoogleSignInExceptionCode.canceled) {
+        return 'Google sign-in is not available right now.';
+      }
+      // Google Play services also answers "canceled" when it turns the app
+      // itself away, with its own status code in brackets, e.g. "[16]
+      // Account reauth failed." That is nearly always a build whose SHA-1
+      // fingerprint is missing in the Firebase console, not the player.
+      final refused = e.description?.startsWith('[') ?? false;
+      return refused
+          ? 'Google sign-in is not set up for this version of the game '
+              'yet. ${e.description}'
+          : 'Google sign-in was cancelled.';
     } on FirebaseAuthException catch (e) {
       debugPrint('Sign-in failed: ${e.code} ${e.message}');
       return _authMessages[e.code] ??

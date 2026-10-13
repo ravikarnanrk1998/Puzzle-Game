@@ -7,6 +7,7 @@ import 'shop/player_progress.dart';
 import 'shop/store_service.dart';
 import 'ui/game_screen.dart';
 import 'ui/login_screen.dart';
+import 'versus/match_backend.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +22,7 @@ Future<void> main() async {
     store: store,
     music: GameMusic(),
     account: account,
+    matches: account == null ? null : FirestoreMatches(),
   ));
 }
 
@@ -31,6 +33,7 @@ class BikeRushApp extends StatelessWidget {
     required this.store,
     this.music,
     this.account,
+    this.matches,
   });
 
   final PlayerProgress progress;
@@ -41,6 +44,9 @@ class BikeRushApp extends StatelessWidget {
   /// device only.
   final AccountService? account;
 
+  /// Where 1 vs 1 matches are kept. Null means no 1 vs 1.
+  final MatchBackend? matches;
+
   @override
   Widget build(BuildContext context) {
     final account = this.account;
@@ -49,6 +55,7 @@ class BikeRushApp extends StatelessWidget {
       store: store,
       music: music,
       account: account,
+      matches: matches,
     );
     return MaterialApp(
       title: 'Bike Rush',

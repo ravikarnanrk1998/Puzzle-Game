@@ -49,6 +49,14 @@ The IDs must match **exactly**. The prices are only suggestions; pick your own.
 | `double_coins` | Double Coins      | Coins count x2 forever (one-time)   | ₹99             |
 | `bike_gold`    | Gold Rush Bike    | Premium bike, full nitro + shield   | ₹149            |
 | `bike_neon`    | Neon Ghost Bike   | Premium bike, 5 lives + shield      | ₹199            |
+| `diamonds_1`   | 1 Diamond         | +1 diamond (can buy again)          | ₹10             |
+| `diamonds_10`  | 10 Diamonds       | +10 diamonds (can buy again)        | ₹79             |
+| `diamonds_20`  | 20 Diamonds       | +20 diamonds (can buy again)        | ₹149            |
+| `diamonds_50`  | 50 Diamonds       | +50 diamonds (can buy again)        | ₹349            |
+| `diamonds_100` | 100 Diamonds      | +100 diamonds (can buy again)       | ₹599            |
+
+Diamonds pay for 1 VS 1 matches (see section 7). Until the five `diamonds_…` products exist
+and are Active, the **DIAMONDS** tab in the garage shows "BUY" buttons that do nothing.
 
 Set every product to **Active**.
 
@@ -95,7 +103,12 @@ Graphics are ready in `store_listing/`:
   and account management). Nothing is shared with other companies. Data is encrypted in
   transit. Payments are handled by Google Play.
 - **Account deletion**: because players can create an account, Play asks for a way to delete
-  it, both inside the app and through a web link. The game does not have this yet.
+  it, both inside the app and through a web link.
+  - In the app: on the menu, tap the email at the top left → **DELETE ACCOUNT** → confirm.
+    This deletes the account and its saved data (coins, bikes, best score) for good.
+  - Web link: Play asks for a URL in the Data safety form. A simple page (it can be part of
+    the privacy policy page) that explains the steps above and gives an email address for
+    players who can't open the game is enough.
 - **Content rating**: fill in the questionnaire (a racing game with no violence gets a low rating).
 - **Target audience**: 13+ (choosing under-13 brings extra Families policy rules).
 
@@ -136,6 +149,27 @@ without sign-in, and saves on the phone only.
 
 Each player's save is one document in Firestore at `users/<their account id>`. You can look at
 it in the console, and the rules let only that player read or change it.
+
+### 1 VS 1 matches
+
+The **1 VS 1** button on the menu lets two signed-in players race at the same time. One taps
+**CREATE CODE** and sends the 6-digit code to a friend, who types it under **ENTER CODE**.
+Both then ride their own road, see each other's score, and the higher score wins.
+
+Creating a code costs **1 diamond**; joining a friend's code is free. If the player cancels
+before a friend joins, the diamond is given back. Players get diamonds two ways:
+
+- **Free**: 1 diamond a day, with the **CLAIM DAILY +1** button on the menu.
+- **Paid**: packs of 1, 10, 20, 50 and 100 in **GARAGE → DIAMONDS** (the `diamonds_…`
+  products in section 3).
+
+Matches are kept in Firestore under `matches/<code>` while they are played, so they need their
+own rules. Whenever `firestore.rules` changes, paste the whole file into **Firestore Database →
+Rules** again and press **Publish**. Until the match rules are published, the game says
+"1 VS 1 is not switched on yet."
+
+A riding player sends their score every 3 seconds, so a two-minute match is about 80 writes.
+The free Firebase plan allows 20,000 writes a day.
 
 ## Regenerating the icon and store images
 

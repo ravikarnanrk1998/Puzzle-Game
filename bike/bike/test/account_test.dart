@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:bike/account/account_service.dart';
 import 'package:bike/account/cloud_save.dart';
 import 'package:bike/main.dart';
 import 'package:bike/shop/catalog.dart';
@@ -11,69 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Stands in for Firestore: one server shared by every device in a test.
-class FakeSaves implements SaveBackend {
-  final Map<String, SaveData> saves = {};
-  final List<SaveDelta> writes = [];
-  final List<void Function()> _watchers = [];
-
-  /// While offline, devices only see the copy they have cached.
-  bool online = true;
-
-  @override
-  Stream<CloudSnapshot> watch(String uid) {
-    final out = StreamController<CloudSnapshot>();
-    void emit() => out.add((save: saves[uid], fromServer: online));
-    _watchers.add(emit);
-    out.onCancel = () => _watchers.remove(emit);
-    emit();
-    return out.stream;
-  }
-
-  @override
-  void write(String uid, SaveDelta delta) {
-    writes.add(delta);
-    change(uid, delta);
-  }
-
-  /// Changes a save the way a write does, e.g. from another device.
-  void change(String uid, SaveDelta d) {
-    final s = saves[uid] ?? const SaveData();
-    saves[uid] = SaveData(
-      wallet: s.wallet + d.coins,
-      best: d.best ?? s.best,
-      doubleCoins: s.doubleCoins || d.doubleCoins,
-      owned: {...s.owned, ...d.bikes},
-      selected: d.selected ?? s.selected,
-      delivered: {...s.delivered, ...d.orders}.toList(),
-    );
-    notify();
-  }
-
-  void notify() {
-    for (final emit in [..._watchers]) {
-      emit();
-    }
-  }
-
-  @override
-  Future<void> flush() async {}
-}
-
-/// An [AccountService] that never talks to Firebase.
-class TestAccount extends AccountService {
-  TestAccount(super.cloud);
-
-  @override
-  Future<String?> signInWithEmail(String email, String password) async {
-    if (password != 'secret1') return 'Wrong email or password.';
-    handleUser(email, name: email);
-    return null;
-  }
-
-  @override
-  Future<void> signOut() async => handleUser(null);
-}
+import 'fakes.dart';
 
 void main() {
   group('SaveData', () {
@@ -99,18 +36,25 @@ void main() {
     test('progress made before signing in is added to the account', () {
       const cloud = SaveData(
         wallet: 300,
+        diamonds: 5,
         owned: {'red', 'sun'},
         selected: 'sun',
         delivered: ['GPA.1'],
+        dailyClaim: '2026-10-10',
       );
       const guest = SaveData(
         wallet: 50,
+        diamonds: 2,
         owned: {'red', 'blue'},
         selected: 'blue',
         delivered: ['GPA.2'],
+        dailyClaim: '2026-10-12',
       );
       final merged = cloud.merge(guest, guest: true);
       expect(merged.wallet, 350);
+      expect(merged.diamonds, 7);
+      expect(merged.dailyClaim, '2026-10-12',
+          reason: 'the later claim counts, so a day is never claimed twice');
       expect(merged.owned, {'red', 'sun', 'blue'});
       expect(merged.selected, 'sun');
       expect(merged.delivered, ['GPA.1', 'GPA.2']);
@@ -265,6 +209,53 @@ void main() {
       expect(server.saves['ravi']!.owned, contains('gold'),
           reason: 'the phone sends the bike again');
     });
+
+    test('diamonds and the daily claim follow the account', () async {
+      await cloud.attach('ravi');
+      phone
+        ..claimDaily(DateTime(2026, 10, 12, 9))
+        ..addDiamonds(10)
+        ..spendDiamonds(1);
+      await pumpEventQueue();
+      expect(server.saves['ravi']!.diamonds, 10);
+      expect(server.saves['ravi']!.dailyClaim, '2026-10-12');
+
+      // The same player on a new phone.
+      cloud.detach();
+      expect(phone.diamonds, 0);
+      await cloud.attach('ravi');
+      expect(phone.diamonds, 10);
+      expect(phone.canClaimDaily(DateTime(2026, 10, 12, 20)), isFalse,
+          reason: 'today was already claimed on the other phone');
+      expect(phone.canClaimDaily(DateTime(2026, 10, 13, 8)), isTrue);
+    });
+
+    test('deleting the account removes the save for good', () async {
+      await cloud.attach('ravi');
+      phone.addCoins(5000);
+      await pumpEventQueue();
+      await cloud.erase();
+      await pumpEventQueue();
+      expect(server.saves, isNot(contains('ravi')),
+          reason: 'the phone must not send its copy back');
+      // The account itself is gone next, which signs the player out.
+      cloud.detach();
+      expect(phone.wallet, 0);
+      await cloud.attach('ravi');
+      expect(phone.wallet, 0, reason: 'a new account starts from nothing');
+    });
+
+    test('a delete that fails half way loses nothing', () async {
+      await cloud.attach('ravi');
+      phone.addCoins(5000);
+      await pumpEventQueue();
+      // The save is deleted, but then deleting the account itself fails.
+      await cloud.erase();
+      await cloud.attach('ravi');
+      await pumpEventQueue();
+      expect(phone.wallet, 5000);
+      expect(server.saves['ravi']!.wallet, 5000);
+    });
   });
 
   testWidgets('the game opens on the login screen until the player signs in',
@@ -302,15 +293,75 @@ void main() {
     expect(find.text('PLAY'), findsOneWidget);
     expect(find.text('42,000'), findsOneWidget);
 
-    // The account button on the menu signs out again.
-    await tester.tap(find.text(email));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('SIGN OUT'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    // The account button on the menu offers exactly two things.
+    Future<void> tapAndWait(Finder finder) async {
+      await tester.tap(finder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    await tapAndWait(find.text(email));
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.bySubtype<ButtonStyleButton>(),
+      ),
+      findsNWidgets(2),
+    );
+    expect(find.text('DELETE ACCOUNT'), findsOneWidget);
+    await tapAndWait(find.text('LOG OUT'));
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(progress.wallet, 0);
     expect(server.saves[email]!.wallet, 42000);
+  });
+
+  testWidgets('deleting the account asks first, then removes everything',
+      (tester) async {
+    const email = 'ravi@example.com';
+    final server = FakeSaves()
+      ..saves[email] =
+          const SaveData(wallet: 42000, owned: {'red'}, selected: 'red');
+    final progress = PlayerProgress.memory();
+    final account = TestAccount(CloudSave(progress, server));
+    await tester.pumpWidget(BikeRushApp(
+      progress: progress,
+      store: StoreService(progress, enabled: false),
+      account: account,
+    ));
+    await account.signInWithEmail(email, 'secret1');
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('42,000'), findsOneWidget);
+
+    Future<void> tapAndWait(Finder finder) async {
+      await tester.tap(finder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    // Changing your mind keeps everything.
+    await tapAndWait(find.text(email));
+    await tapAndWait(find.text('DELETE ACCOUNT'));
+    expect(find.text('Delete account?'), findsOneWidget);
+    await tapAndWait(find.text('CANCEL'));
+    expect(find.text('PLAY'), findsOneWidget);
+    expect(server.saves[email]!.wallet, 42000);
+
+    await tapAndWait(find.text(email));
+    await tapAndWait(find.text('DELETE ACCOUNT'));
+    await tapAndWait(find.text('DELETE'));
+    expect(find.text('Enter your password to confirm.'), findsOneWidget);
+    expect(server.saves[email]!.wallet, 42000);
+
+    await tester.enterText(find.byType(TextField), 'secret1');
+    await tapAndWait(find.text('DELETE'));
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Delete account?'), findsNothing);
+    expect(server.saves, isNot(contains(email)));
+    expect(progress.wallet, 0);
+    expect(progress.owner, isNull);
+    // Let the "deleted" message finish showing.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 1));
   });
 }

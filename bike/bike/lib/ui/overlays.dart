@@ -6,8 +6,11 @@ import 'package:flutter/material.dart';
 import '../game/bike_game.dart';
 import '../shop/catalog.dart';
 import '../shop/player_progress.dart';
+import '../versus/match_backend.dart';
+import '../versus/versus_match.dart';
 
 const _gold = Color(0xFFFFC107);
+const _diamond = Color(0xFF40C4FF);
 const _panelColor = Color(0xE6141824);
 
 const _labelStyle = TextStyle(
@@ -37,15 +40,20 @@ class Hud extends StatelessWidget {
     required this.game,
     required this.onPause,
     required this.onBoost,
+    this.versus,
   });
 
   final BikeGame game;
   final VoidCallback onPause;
   final VoidCallback onBoost;
 
+  /// The 1 vs 1 match this run is part of, if any.
+  final VersusMatch? versus;
+
   @override
   Widget build(BuildContext context) {
     final g = game;
+    final rival = versus?.opponent;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -158,6 +166,15 @@ class Hud extends StatelessWidget {
                 ),
               ),
             ),
+            if (rival != null)
+              Positioned(
+                top: 104,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Center(child: _RivalChip(rival: rival)),
+                ),
+              ),
             Positioned(
               left: 0,
               bottom: 0,
@@ -186,7 +203,7 @@ class Hud extends StatelessWidget {
                     opacity: (4.5 - g.playTime).clamp(0.0, 1.0),
                     child: const Align(
                       alignment: Alignment(0, 0.25),
-                      child: _TapHint(),
+                      child: _ControlsHint(),
                     ),
                   ),
                 ),
@@ -241,8 +258,8 @@ class _RoundButton extends StatelessWidget {
   }
 }
 
-class _TapHint extends StatelessWidget {
-  const _TapHint();
+class _ControlsHint extends StatelessWidget {
+  const _ControlsHint();
 
   @override
   Widget build(BuildContext context) {
@@ -252,24 +269,42 @@ class _TapHint extends StatelessWidget {
       fontWeight: FontWeight.w900,
       letterSpacing: 2,
     );
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _Chip(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.chevron_left_rounded, color: Colors.white, size: 30),
-              Text('TAP', style: style),
-            ],
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _Chip(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.chevron_left_rounded,
+                      color: Colors.white, size: 30),
+                  Text('TAP', style: style),
+                ],
+              ),
+            ),
+            _Chip(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('TAP', style: style),
+                  Icon(Icons.chevron_right_rounded,
+                      color: Colors.white, size: 30),
+                ],
+              ),
+            ),
+          ],
         ),
+        SizedBox(height: 12),
         _Chip(
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('TAP', style: style),
-              Icon(Icons.chevron_right_rounded, color: Colors.white, size: 30),
+              Icon(Icons.swipe_rounded, color: Colors.white, size: 24),
+              SizedBox(width: 8),
+              Text('OR SWIPE', style: style),
             ],
           ),
         ),
@@ -411,14 +446,20 @@ class BigButton extends StatelessWidget {
               children: [
                 Icon(icon, color: Colors.white, size: 32),
                 const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    fontStyle: FontStyle.italic,
-                    letterSpacing: 1.5,
+                // Long labels shrink to fit rather than spill out.
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -503,6 +544,62 @@ class WalletChip extends StatelessWidget {
   }
 }
 
+/// Diamond balance chip shown on the menu, in the shop and on the 1 vs 1
+/// screen.
+class DiamondChip extends StatelessWidget {
+  const DiamondChip({super.key, required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Chip(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.diamond, color: _diamond, size: 20),
+          const SizedBox(width: 6),
+          Text(formatNumber(count),
+              style: _valueStyle.copyWith(fontSize: 18)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Hands out the free daily diamond.
+class _DailyClaimButton extends StatelessWidget {
+  const _DailyClaimButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(14);
+    return Material(
+      color: const Color(0xFF00C853),
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 6),
+              Text('CLAIM DAILY +1', style: _smallStyle),
+              SizedBox(width: 4),
+              Icon(Icons.diamond, color: Colors.white, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class MenuOverlay extends StatelessWidget {
   const MenuOverlay({
     super.key,
@@ -512,12 +609,22 @@ class MenuOverlay extends StatelessWidget {
     required this.onShop,
     this.accountName,
     this.onAccount,
+    this.onVersus,
+    this.onClaimDaily,
   });
 
   final BikeGame game;
   final PlayerProgress progress;
   final VoidCallback onPlay;
   final VoidCallback onShop;
+
+  /// Opens a 1 vs 1 match. The button is hidden when this is null, as
+  /// matches need a signed-in player. So are the diamonds that pay for
+  /// matches.
+  final VoidCallback? onVersus;
+
+  /// Claims the free daily diamond. Null once today's has been claimed.
+  final VoidCallback? onClaimDaily;
 
   /// The signed-in player. The account button is hidden when [onAccount]
   /// is null (the game is running without accounts).
@@ -541,7 +648,10 @@ class MenuOverlay extends StatelessWidget {
           children: [
             Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 56, 24, 24),
+                // Starts below the top bar, which is a row taller while
+                // the daily claim is showing.
+                padding: EdgeInsets.fromLTRB(
+                    24, onClaimDaily == null ? 56 : 100, 24, 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -568,6 +678,15 @@ class MenuOverlay extends StatelessWidget {
                         onTap: onPlay,
                       ),
                     ),
+                    if (onVersus != null) ...[
+                      const SizedBox(height: 14),
+                      BigButton(
+                        label: '1 VS 1',
+                        icon: Icons.people_alt_rounded,
+                        onTap: onVersus!,
+                        colors: const [Color(0xFFFF4081), Color(0xFFC51162)],
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     BigButton(
                       label: 'GARAGE',
@@ -599,18 +718,49 @@ class MenuOverlay extends StatelessWidget {
                 ),
               ),
             ),
+            // Top bar: the account on the left, diamonds and coins on the
+            // right, with the daily claim under them while it is waiting.
             Positioned(
               top: 10,
+              left: 10,
               right: 10,
-              child: WalletChip(
-                  coins: progress.wallet, doubled: progress.doubleCoins),
-            ),
-            if (onAccount != null)
-              Positioned(
-                top: 10,
-                left: 10,
-                child: _AccountChip(name: accountName, onTap: onAccount!),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Gives way to the balances on a narrow screen.
+                  Flexible(
+                    child: onAccount == null
+                        ? const SizedBox.shrink()
+                        : _AccountChip(name: accountName, onTap: onAccount!),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (onVersus != null) ...[
+                            DiamondChip(count: progress.diamonds),
+                            const SizedBox(width: 8),
+                          ],
+                          WalletChip(
+                            coins: progress.wallet,
+                            doubled: progress.doubleCoins,
+                          ),
+                        ],
+                      ),
+                      if (onClaimDaily != null) ...[
+                        const SizedBox(height: 8),
+                        _DailyClaimButton(onTap: onClaimDaily!),
+                      ],
+                    ],
+                  ),
+                ],
               ),
+            ),
           ],
         ),
       ),
@@ -634,12 +784,15 @@ class _AccountChip extends StatelessWidget {
           children: [
             const Icon(Icons.account_circle, color: Colors.white, size: 22),
             const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 120),
-              child: Text(
-                name ?? 'Account',
-                overflow: TextOverflow.ellipsis,
-                style: _smallStyle,
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 120),
+                child: Text(
+                  name ?? 'Account',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _smallStyle,
+                ),
               ),
             ),
           ],
@@ -692,7 +845,7 @@ class _HowToPlay extends StatelessWidget {
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.linux;
     final rows = [
-      (Icons.touch_app, 'Tap left / right side to switch lanes'),
+      (Icons.touch_app, 'Tap or swipe left / right to switch lanes'),
       if (hasKeyboard)
         (Icons.keyboard, 'Keyboard: ← → or A / D, Space = boost'),
       (Icons.monetization_on, 'Coins and close calls charge your NITRO'),
@@ -738,7 +891,9 @@ class PauseOverlay extends StatelessWidget {
   });
 
   final VoidCallback onResume;
-  final VoidCallback onRestart;
+
+  /// Null hides the button: a 1 vs 1 run can't be started over.
+  final VoidCallback? onRestart;
   final VoidCallback onMenu;
 
   @override
@@ -767,13 +922,15 @@ class PauseOverlay extends StatelessWidget {
                     icon: Icons.play_arrow_rounded,
                     onTap: onResume,
                   ),
-                  const SizedBox(height: 14),
-                  BigButton(
-                    label: 'RESTART',
-                    icon: Icons.replay_rounded,
-                    onTap: onRestart,
-                    colors: const [Color(0xFF42A5F5), Color(0xFF1565C0)],
-                  ),
+                  if (onRestart != null) ...[
+                    const SizedBox(height: 14),
+                    BigButton(
+                      label: 'RESTART',
+                      icon: Icons.replay_rounded,
+                      onTap: onRestart!,
+                      colors: const [Color(0xFF42A5F5), Color(0xFF1565C0)],
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   TextButton.icon(
                     onPressed: onMenu,
@@ -986,6 +1143,258 @@ class _Stat extends StatelessWidget {
           ),
         ),
         Text(label, style: _labelStyle.copyWith(fontSize: 10)),
+      ],
+    );
+  }
+}
+
+// --------------------------------------------------------------- 1 vs 1
+
+/// The other player's score, shown while riding in a 1 vs 1 match.
+class _RivalChip extends StatelessWidget {
+  const _RivalChip({required this.rival});
+
+  final MatchPlayer rival;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Chip(
+      color: rival.done ? const Color(0xCC37474F) : const Color(0xCCC51162),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.people_alt_rounded, color: Colors.white, size: 18),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 110),
+            child: Text(
+              rival.name,
+              overflow: TextOverflow.ellipsis,
+              style: _smallStyle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(formatNumber(rival.score),
+              style: _smallStyle.copyWith(color: _gold)),
+          if (rival.done) ...[
+            const SizedBox(width: 6),
+            Text('OUT',
+                style: _smallStyle.copyWith(color: const Color(0xFFFF8A80))),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Counts down to the start of a 1 vs 1 run.
+class VersusCountdown extends StatelessWidget {
+  const VersusCountdown({
+    super.key,
+    required this.match,
+    required this.seconds,
+  });
+
+  final VersusMatch match;
+  final int seconds;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xAA000000),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('1 VS 1', style: _labelStyle),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'YOU  vs  ${match.opponent?.name ?? '…'}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$seconds',
+                  style: const TextStyle(
+                    color: _gold,
+                    fontSize: 110,
+                    fontWeight: FontWeight.w900,
+                    fontStyle: FontStyle.italic,
+                    height: 1.2,
+                  ),
+                ),
+                const Text('GET READY', style: _labelStyle),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Takes the place of the game over screen in a 1 vs 1 match.
+class VersusResultOverlay extends StatelessWidget {
+  const VersusResultOverlay({
+    super.key,
+    required this.match,
+    required this.coinsEarned,
+    required this.onLeave,
+  });
+
+  final VersusMatch match;
+  final int coinsEarned;
+  final VoidCallback onLeave;
+
+  @override
+  Widget build(BuildContext context) {
+    final rival = match.opponent;
+    final rivalName = rival?.name ?? 'Opponent';
+    final (title, color, icon) = switch (match.outcome) {
+      VersusOutcome.win => (
+          'YOU WIN!',
+          const Color(0xFF69F0AE),
+          Icons.emoji_events,
+        ),
+      VersusOutcome.lose => (
+          'YOU LOSE',
+          const Color(0xFFFF5252),
+          Icons.sentiment_dissatisfied_rounded,
+        ),
+      VersusOutcome.draw => ('DRAW', _gold, Icons.handshake_rounded),
+      null => ('WAITING…', Colors.white, Icons.hourglass_top_rounded),
+    };
+    final note = match.opponentLeft
+        ? '$rivalName left the match.'
+        : match.outcome == null
+            ? '$rivalName is still riding. They win if they pass your score.'
+            : null;
+    return ColoredBox(
+      color: const Color(0xAA000000),
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: _FadeIn(
+              child: _Panel(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, color: color, size: 48),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    if (note != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          note,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 14),
+                        ),
+                      ),
+                    const SizedBox(height: 18),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _VersusScore(
+                            name: 'YOU',
+                            score: match.myScore,
+                            status: 'finished',
+                          ),
+                        ),
+                        Expanded(
+                          child: _VersusScore(
+                            name: rivalName,
+                            score: rival?.score ?? 0,
+                            status: match.opponentLeft
+                                ? 'left'
+                                : (rival?.done ?? false)
+                                    ? 'finished'
+                                    : 'riding…',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.monetization_on,
+                            color: _gold, size: 20),
+                        const SizedBox(width: 6),
+                        Text('+$coinsEarned coins', style: _smallStyle),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    BigButton(
+                      label: 'MENU',
+                      icon: Icons.home_rounded,
+                      onTap: onLeave,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VersusScore extends StatelessWidget {
+  const _VersusScore({
+    required this.name,
+    required this.score,
+    required this.status,
+  });
+
+  final String name;
+  final int score;
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          name.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _labelStyle,
+        ),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            formatNumber(score),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 34,
+              fontWeight: FontWeight.w900,
+              height: 1.2,
+            ),
+          ),
+        ),
+        Text(status,
+            style: const TextStyle(color: Colors.white54, fontSize: 12)),
       ],
     );
   }

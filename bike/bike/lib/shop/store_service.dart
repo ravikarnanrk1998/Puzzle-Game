@@ -131,14 +131,20 @@ class StoreService extends ChangeNotifier {
   void _deliver(PurchaseDetails p) {
     final id = p.productID;
     final pack = Catalog.coinPack(id);
-    if (pack != null) {
-      // A coin pack can be reported again if the app closed before the
-      // purchase was completed; credit each order only once.
+    final diamonds = Catalog.diamondPack(id);
+    if (pack != null || diamonds != null) {
+      // A pack can be reported again if the app closed before the purchase
+      // was completed; credit each order only once.
       final orderId =
           p.purchaseID ?? p.verificationData.serverVerificationData;
       if (!progress.markDelivered(orderId)) return;
-      progress.addCoins(pack.coins);
-      _messages.add('+${formatNumber(pack.coins)} coins added!');
+      if (pack != null) {
+        progress.addCoins(pack.coins);
+        _messages.add('+${formatNumber(pack.coins)} coins added!');
+      } else {
+        progress.addDiamonds(diamonds!.diamonds);
+        _messages.add('+${diamonds.diamonds} diamonds added!');
+      }
       return;
     }
     if (id == Catalog.doubleCoinsId) {

@@ -280,6 +280,13 @@ class BikeGame extends ChangeNotifier {
 
   void togglePause() => phase == GamePhase.paused ? resume() : pause();
 
+  /// Ends the run where it stands, without a crash.
+  void finishRun() {
+    if (phase != GamePhase.playing && phase != GamePhase.paused) return;
+    _endGame();
+    notifyListeners();
+  }
+
   void goToMenu() {
     phase = GamePhase.menu;
     vehicles.clear();

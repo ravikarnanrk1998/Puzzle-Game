@@ -6,7 +6,7 @@ import '../game/bike_art.dart';
 import '../shop/catalog.dart';
 import '../shop/player_progress.dart';
 import '../shop/store_service.dart';
-import 'overlays.dart' show WalletChip;
+import 'overlays.dart' show DiamondChip, WalletChip;
 
 const _bg = Color(0xFF0D1020);
 const _card = Color(0xFF171C2B);
@@ -24,7 +24,7 @@ class ShopScreen extends StatefulWidget {
   final PlayerProgress progress;
   final StoreService store;
 
-  /// 0 = bikes, 1 = coins.
+  /// 0 = bikes, 1 = coins, 2 = diamonds.
   final int initialTab;
 
   @override
@@ -63,7 +63,7 @@ class _ShopScreenState extends State<ShopScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       initialIndex: widget.initialTab,
       child: ListenableBuilder(
         listenable: Listenable.merge([_progress, _store]),
@@ -98,10 +98,13 @@ class _ShopScreenState extends State<ShopScreen> {
               tabs: [
                 Tab(icon: Icon(Icons.two_wheeler), text: 'BIKES'),
                 Tab(icon: Icon(Icons.monetization_on), text: 'COINS'),
+                Tab(icon: Icon(Icons.diamond), text: 'DIAMONDS'),
               ],
             ),
           ),
-          body: TabBarView(children: [_bikesTab(), _coinsTab()]),
+          body: TabBarView(
+            children: [_bikesTab(), _coinsTab(), _diamondsTab()],
+          ),
         ),
       ),
     );
@@ -169,25 +172,33 @@ class _ShopScreenState extends State<ShopScreen> {
 
   // ---------------------------------------------------------------- coins
 
+  /// A note at the top of a tab that sells for real money, when the store
+  /// can't be used.
+  List<Widget> _storeStatus() {
+    return [
+      if (!_store.enabled)
+        const _Info(
+            'Real-money purchases work in the Android app installed '
+            'from Google Play.')
+      else if (_store.loading && _store.products.isEmpty)
+        const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        )
+      else if (!_store.available || _store.products.isEmpty)
+        _Info(
+          'Google Play store is not available right now. '
+          'Check your internet connection.',
+          onRetry: _store.init,
+        ),
+    ];
+  }
+
   Widget _coinsTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (!_store.enabled)
-          const _Info(
-              'Real-money purchases work in the Android app installed '
-              'from Google Play.')
-        else if (_store.loading && _store.products.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else if (!_store.available || _store.products.isEmpty)
-          _Info(
-            'Google Play store is not available right now. '
-            'Check your internet connection.',
-            onRetry: _store.init,
-          ),
+        ..._storeStatus(),
         for (var i = 0; i < Catalog.coinPacks.length; i++) ...[
           _Card(
             leading: _CoinStack(count: i + 1),
@@ -240,6 +251,55 @@ class _ShopScreenState extends State<ShopScreen> {
         const SizedBox(height: 8),
         const Text(
           'Coins you collect while riding are added to your wallet for free.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white38, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  // ------------------------------------------------------------- diamonds
+
+  Widget _diamondsTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ..._storeStatus(),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Center(child: DiamondChip(count: _progress.diamonds)),
+        ),
+        for (final pack in Catalog.diamondPacks) ...[
+          _Card(
+            leading: Container(
+              width: 64,
+              height: 64,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [Color(0xFF40C4FF), Color(0xFF304FFE)],
+                ),
+              ),
+              child: const Icon(Icons.diamond, color: Colors.white, size: 34),
+            ),
+            title: pack.diamonds == 1
+                ? '1 DIAMOND'
+                : '${pack.diamonds} DIAMONDS',
+            badge: pack.badge,
+            subtitle: pack.diamonds == 1
+                ? 'Create one 1 VS 1 match'
+                : 'Create ${pack.diamonds} 1 VS 1 matches',
+            action: _priceButton(pack.productId),
+          ),
+          const SizedBox(height: 12),
+        ],
+        const SizedBox(height: 4),
+        const Text(
+          'Creating a 1 VS 1 code costs '
+          '${Catalog.versusCost} diamond. Joining a friend is free.\n'
+          'Every day you can claim '
+          '${PlayerProgress.dailyDiamonds} free diamond on the menu.',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white38, fontSize: 12),
         ),

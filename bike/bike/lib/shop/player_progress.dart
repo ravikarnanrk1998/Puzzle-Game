@@ -32,15 +32,27 @@ class PlayerProgress extends ChangeNotifier {
   static const _kSelected = 'selected_bike';
   static const _kDelivered = 'delivered_purchases';
   static const _kOwner = 'owner';
+  static const _kDiamonds = 'diamonds';
+  static const _kDailyClaim = 'daily_claim';
+
+  /// Diamonds given by the free daily claim.
+  static const dailyDiamonds = 1;
 
   final SharedPreferences? _prefs;
 
   int wallet = 0;
+
+  /// The second currency: paid to create a 1 vs 1 match, earned once a day
+  /// for free or bought in the garage.
+  int diamonds = 0;
   int best = 0;
   bool doubleCoins = false;
   Set<String> owned = {Catalog.bikes.first.id};
   String selected = Catalog.bikes.first.id;
   final List<String> _delivered = [];
+
+  /// The day the daily diamond was last claimed, as '2026-10-13'.
+  String? dailyClaim;
 
   /// The account this progress belongs to. Null for progress made without
   /// signing in.
@@ -54,16 +66,20 @@ class PlayerProgress extends ChangeNotifier {
 
   SaveData get data => SaveData(
         wallet: wallet,
+        diamonds: diamonds,
         best: best,
         doubleCoins: doubleCoins,
         owned: {...owned},
         selected: selected,
         delivered: [..._delivered],
+        dailyClaim: dailyClaim,
       );
 
   /// Replaces all progress, e.g. with the player's cloud save.
   void restore(SaveData data, {String? owner}) {
     wallet = data.wallet;
+    diamonds = data.diamonds;
+    dailyClaim = data.dailyClaim;
     best = data.best;
     doubleCoins = data.doubleCoins;
     owned = {Catalog.bikes.first.id, ...data.owned};
@@ -92,6 +108,8 @@ class PlayerProgress extends ChangeNotifier {
     if (!owned.contains(selected)) selected = Catalog.bikes.first.id;
     _delivered.addAll(p.getStringList(_kDelivered) ?? const []);
     owner = p.getString(_kOwner);
+    diamonds = p.getInt(_kDiamonds) ?? 0;
+    dailyClaim = p.getString(_kDailyClaim);
   }
 
   void _save() {
@@ -109,8 +127,47 @@ class PlayerProgress extends ChangeNotifier {
       } else {
         p.setString(_kOwner, owner);
       }
+      p.setInt(_kDiamonds, diamonds);
+      final dailyClaim = this.dailyClaim;
+      if (dailyClaim == null) {
+        p.remove(_kDailyClaim);
+      } else {
+        p.setString(_kDailyClaim, dailyClaim);
+      }
     }
     notifyListeners();
+  }
+
+  static String _day(DateTime t) => '${t.year}-'
+      '${t.month.toString().padLeft(2, '0')}-'
+      '${t.day.toString().padLeft(2, '0')}';
+
+  /// Whether the free daily diamond is still waiting to be claimed today.
+  bool canClaimDaily([DateTime? now]) {
+    final last = dailyClaim;
+    return last == null || _day(now ?? DateTime.now()).compareTo(last) > 0;
+  }
+
+  /// Hands out today's free diamond. Returns false if it was already
+  /// claimed today.
+  bool claimDaily([DateTime? now]) {
+    if (!canClaimDaily(now)) return false;
+    dailyClaim = _day(now ?? DateTime.now());
+    diamonds += dailyDiamonds;
+    _save();
+    return true;
+  }
+
+  bool spendDiamonds(int amount) {
+    if (amount < 0 || diamonds < amount) return false;
+    diamonds -= amount;
+    _save();
+    return true;
+  }
+
+  void addDiamonds(int amount) {
+    diamonds += amount;
+    _save();
   }
 
   /// Banks the coins from a run and updates the best score.
@@ -168,7 +225,7 @@ class PlayerProgress extends ChangeNotifier {
     return true;
   }
 
-  /// Remembers a store order so the same coin pack is never credited twice.
+  /// Remembers a store order so the same pack is never credited twice.
   /// Returns false if [purchaseId] was already delivered.
   bool markDelivered(String purchaseId) {
     if (_delivered.contains(purchaseId)) return false;

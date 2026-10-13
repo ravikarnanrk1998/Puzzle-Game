@@ -42,10 +42,21 @@ class CoinPack {
   final String? badge;
 }
 
+class DiamondPack {
+  const DiamondPack(this.productId, this.diamonds, {this.badge});
+
+  final String productId;
+  final int diamonds;
+  final String? badge;
+}
+
 /// Everything sold in the game. The product ids here must match the in-app
 /// products created in Google Play Console exactly.
 class Catalog {
   static const String doubleCoinsId = 'double_coins';
+
+  /// Diamonds it costs to create a 1 vs 1 match. Joining one is free.
+  static const int versusCost = 1;
 
   static const List<BikeSkin> bikes = [
     BikeSkin(
@@ -117,8 +128,17 @@ class Catalog {
     CoinPack('coins_large', 80000, badge: 'BEST VALUE'),
   ];
 
+  static const List<DiamondPack> diamondPacks = [
+    DiamondPack('diamonds_1', 1),
+    DiamondPack('diamonds_10', 10),
+    DiamondPack('diamonds_20', 20, badge: 'POPULAR'),
+    DiamondPack('diamonds_50', 50),
+    DiamondPack('diamonds_100', 100, badge: 'BEST VALUE'),
+  ];
+
   static Set<String> get productIds => {
         for (final p in coinPacks) p.productId,
+        for (final p in diamondPacks) p.productId,
         doubleCoinsId,
         for (final b in bikes)
           if (b.productId != null) b.productId!,
@@ -141,7 +161,15 @@ class Catalog {
     return null;
   }
 
-  static bool isConsumable(String productId) => coinPack(productId) != null;
+  static DiamondPack? diamondPack(String productId) {
+    for (final p in diamondPacks) {
+      if (p.productId == productId) return p;
+    }
+    return null;
+  }
+
+  static bool isConsumable(String productId) =>
+      coinPack(productId) != null || diamondPack(productId) != null;
 }
 
 /// 15000 -> "15,000"
