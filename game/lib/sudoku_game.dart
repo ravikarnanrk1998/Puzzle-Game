@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'store/diamonds.dart';
 import 'store/store_page.dart';
 import 'store/store_service.dart';
 import 'ui/ambient_background.dart';
@@ -181,40 +182,48 @@ class SudokuLevelSelectPage extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.white,
+        actions: const [
+          DiamondBalance(),
+          SizedBox(width: 12),
+        ],
       ),
       body: AmbientGlowBackground(
         gradientColors: const [Color(0xFF0B1330), Color(0xFF1A1440)],
         child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _levelCard(
-                    context,
-                    size: 3,
-                    title: '3x3',
-                    subtitle: 'Easy warm-up',
-                    color: const Color(0xFF00E676),
-                  ),
-                  const SizedBox(height: 20),
-                  _levelCard(
-                    context,
-                    size: 6,
-                    title: '6x6',
-                    subtitle: 'Medium challenge',
-                    color: const Color(0xFF00C9FF),
-                  ),
-                  const SizedBox(height: 20),
-                  _levelCard(
-                    context,
-                    size: 9,
-                    title: '9x9',
-                    subtitle: 'Classic Sudoku',
-                    color: const Color(0xFFD500F9),
-                  ),
-                ],
+          child: ListenableBuilder(
+            listenable: StoreService.instance,
+            builder: (context, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _levelCard(
+                      context,
+                      size: 3,
+                      title: '3x3',
+                      subtitle: 'Easy warm-up',
+                      color: const Color(0xFF00E676),
+                    ),
+                    const SizedBox(height: 20),
+                    _levelCard(
+                      context,
+                      size: 6,
+                      title: '6x6',
+                      subtitle: 'Medium challenge',
+                      color: const Color(0xFF00C9FF),
+                    ),
+                    const SizedBox(height: 20),
+                    _levelCard(
+                      context,
+                      size: 9,
+                      title: '9x9',
+                      subtitle: 'Classic Sudoku',
+                      color: const Color(0xFFD500F9),
+                      lockId: LockIds.sudoku9x9,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -229,9 +238,21 @@ class SudokuLevelSelectPage extends StatelessWidget {
     required String title,
     required String subtitle,
     required Color color,
+    String? lockId,
   }) {
+    final locked =
+        lockId != null && !StoreService.instance.isUnlocked(lockId);
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        if (lockId != null &&
+            !await confirmDiamondUnlock(
+              context,
+              lockId: lockId,
+              name: 'Sudoku $title',
+            )) {
+          return;
+        }
+        if (!context.mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => SudokuGamePage(size: size)),
@@ -279,7 +300,17 @@ class SudokuLevelSelectPage extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: color, size: 20),
+            if (locked)
+              const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock, color: Colors.white70, size: 20),
+                  SizedBox(height: 4),
+                  DiamondPrice(StoreService.unlockCost),
+                ],
+              )
+            else
+              Icon(Icons.arrow_forward_ios, color: color, size: 20),
           ],
         ),
       ),

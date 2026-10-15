@@ -1,7 +1,10 @@
 import 'dart:math';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:game/snake_game.dart';
+import 'package:game/store/store_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Every open cell must be reachable, or food could spawn somewhere the
 /// snake can never get to. Movement wraps around the board edges.
@@ -67,5 +70,94 @@ void main() {
     for (final m in kSnakeMaps.where((m) => m.premium)) {
       expect(m.walls, isNotEmpty, reason: '${m.name} needs a layout');
     }
+  });
+
+  group('turns', () {
+    const up = SnakeDirection.up;
+    const down = SnakeDirection.down;
+    const left = SnakeDirection.left;
+    const right = SnakeDirection.right;
+
+    test('two quick swipes both apply, one per move', () {
+      final turns = SnakeTurns()
+        ..add(up, right)
+        ..add(left, right); // doubling back: fine once heading up
+      var heading = right;
+      heading = turns.next(heading);
+      expect(heading, up);
+      heading = turns.next(heading);
+      expect(heading, left);
+      expect(turns.next(heading), left);
+    });
+
+    test('reversing straight back is ignored', () {
+      final turns = SnakeTurns()..add(left, right);
+      expect(turns.next(right), right);
+
+      turns
+        ..add(up, right)
+        ..add(down, right); // reverses the queued up
+      expect(turns.next(right), up);
+      expect(turns.next(up), up);
+    });
+
+    test('repeats are ignored and at most two turns wait', () {
+      final turns = SnakeTurns()
+        ..add(right, right)
+        ..add(up, right)
+        ..add(up, right)
+        ..add(left, right)
+        ..add(down, right);
+      expect(turns.next(right), up);
+      expect(turns.next(up), left);
+      expect(turns.next(left), left);
+    });
+
+    test('clear drops waiting turns', () {
+      final turns = SnakeTurns()..add(up, right);
+      turns.clear();
+      expect(turns.next(right), right);
+    });
+  });
+
+  group('map select', () {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      await StoreService.instance.loadLocal();
+    });
+
+    Future<void> showMapSelect(WidgetTester tester) async {
+      // A phone-sized screen, so every map tile is on screen.
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.625;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(const MaterialApp(home: SnakeMapSelectPage()));
+    }
+
+    testWidgets('a free map opens without asking for diamonds', (
+      tester,
+    ) async {
+      await showMapSelect(tester);
+      await tester.tap(find.text('CLASSIC'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.textContaining('Unlock'), findsNothing);
+      expect(find.byType(SnakeGamePage), findsOneWidget);
+
+      // Let the game run a few moves, then dispose it to stop its timer.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('a locked map asks to unlock first', (tester) async {
+      await showMapSelect(tester);
+      await tester.tap(find.text('OUTRI'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Unlock Outri map'), findsOneWidget);
+      expect(find.byType(SnakeGamePage), findsNothing);
+    });
   });
 }

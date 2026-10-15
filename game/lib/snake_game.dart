@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'store/store_page.dart';
+import 'store/diamonds.dart';
 import 'store/store_service.dart';
 import 'ui/ambient_background.dart';
 import 'ui/glass_panel.dart';
@@ -10,7 +10,39 @@ import 'ui/glass_panel.dart';
 const int kSnakeCols = 13;
 const int kSnakeRows = 19;
 
-enum SnakeDirection { up, down, left, right }
+enum SnakeDirection {
+  up,
+  down,
+  left,
+  right;
+
+  SnakeDirection get opposite => switch (this) {
+    up => down,
+    down => up,
+    left => right,
+    right => left,
+  };
+}
+
+/// Turns swiped between moves, applied one per move. Two quick swipes (say up
+/// then left, to double back) both happen instead of the second being dropped.
+class SnakeTurns {
+  final List<SnakeDirection> _queue = [];
+
+  void clear() => _queue.clear();
+
+  /// Queues [turn] unless it repeats or reverses the way the snake will be
+  /// heading by then.
+  void add(SnakeDirection turn, SnakeDirection current) {
+    final heading = _queue.isEmpty ? current : _queue.last;
+    if (turn == heading || turn == heading.opposite) return;
+    if (_queue.length < 2) _queue.add(turn);
+  }
+
+  /// The direction for the next move.
+  SnakeDirection next(SnakeDirection current) =>
+      _queue.isEmpty ? current : _queue.removeAt(0);
+}
 
 class SnakeMapDef {
   final String id;
@@ -25,7 +57,8 @@ class SnakeMapDef {
     this.premium = false,
   });
 
-  bool get locked => premium && !StoreService.instance.isPremium;
+  bool get locked =>
+      premium && !StoreService.instance.isUnlocked(LockIds.snakeMap(id));
 }
 
 Set<Point<int>> _hLine(int y, int x0, int x1) => {
@@ -198,6 +231,7 @@ class SnakeMapSelectPage extends StatelessWidget {
         elevation: 0,
         foregroundColor: Colors.white,
         actions: [
+          const DiamondBalance(),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: 'Speed settings',
@@ -241,14 +275,19 @@ class _MapTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        if (mapDef.locked &&
+            !await confirmDiamondUnlock(
+              context,
+              lockId: LockIds.snakeMap(mapDef.id),
+              name: '${mapDef.name} map',
+            )) {
+          return;
+        }
+        if (!context.mounted) return;
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => mapDef.locked
-                ? const StorePage()
-                : SnakeGamePage(mapDef: mapDef),
-          ),
+          MaterialPageRoute(builder: (_) => SnakeGamePage(mapDef: mapDef)),
         );
       },
       child: Opacity(
@@ -281,6 +320,10 @@ class _MapTile extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
+                  if (mapDef.locked) ...[
+                    const SizedBox(height: 3),
+                    const DiamondPrice(StoreService.unlockCost, size: 12),
+                  ],
                 ],
               ),
               if (mapDef.premium)
@@ -498,12 +541,18 @@ class SnakeGamePage extends StatefulWidget {
   State<SnakeGamePage> createState() => _SnakeGamePageState();
 }
 
-class _SnakeGamePageState extends State<SnakeGamePage> {
+class _SnakeGamePageState extends State<SnakeGamePage>
+    with SingleTickerProviderStateMixin {
   static const List<int> _tickMillis = [300, 250, 200, 150, 100];
 
   late List<Point<int>> snake;
+  // Where the snake was before the last move, and how far the drawing has
+  // glided from there (0) to [snake] (1).
+  List<Point<int>> prevSnake = [];
+  late final AnimationController _moveAnim;
+  int moves = 0;
   SnakeDirection direction = SnakeDirection.right;
-  SnakeDirection? pendingDirection;
+  final SnakeTurns _turns = SnakeTurns();
   late Point<int> food;
   Timer? _timer;
   int score = 0;
@@ -518,6 +567,7 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
   @override
   void initState() {
     super.initState();
+    _moveAnim = AnimationController(vsync: this, value: 1);
     _loadAndStart();
   }
 
@@ -530,8 +580,11 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
 
   void _startGame() {
     _placeSnakeSafely();
+    prevSnake = List.of(snake);
+    _moveAnim.value = 1;
+    moves = 0;
     direction = SnakeDirection.right;
-    pendingDirection = null;
+    _turns.clear();
     score = 0;
     isGameOver = false;
     isPaused = false;
@@ -574,15 +627,7 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
     food = p;
   }
 
-  void _setDirection(SnakeDirection d) {
-    if ((direction == SnakeDirection.up && d == SnakeDirection.down) ||
-        (direction == SnakeDirection.down && d == SnakeDirection.up) ||
-        (direction == SnakeDirection.left && d == SnakeDirection.right) ||
-        (direction == SnakeDirection.right && d == SnakeDirection.left)) {
-      return;
-    }
-    pendingDirection = d;
-  }
+  void _setDirection(SnakeDirection d) => _turns.add(d, direction);
 
   void _onPanStart(DragStartDetails details) {
     _swipeAccum = Offset.zero;
@@ -607,10 +652,7 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
 
   void _tick() {
     if (isPaused || isGameOver) return;
-    if (pendingDirection != null) {
-      direction = pendingDirection!;
-      pendingDirection = null;
-    }
+    direction = _turns.next(direction);
 
     final head = snake.first;
     Point<int> newHead;
@@ -643,6 +685,8 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
     }
 
     setState(() {
+      prevSnake = List.of(snake);
+      moves++;
       snake.insert(0, newHead);
       if (newHead == food) {
         score += 10;
@@ -651,6 +695,8 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
         snake.removeLast();
       }
     });
+    _moveAnim.duration = _tickDuration();
+    _moveAnim.forward(from: 0);
   }
 
   void _gameOver() {
@@ -789,6 +835,7 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _moveAnim.dispose();
     super.dispose();
   }
 
@@ -883,11 +930,18 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                CustomPaint(
-                                  painter: _SnakeBoardPainter(
-                                    snake: snake,
-                                    food: food,
-                                    walls: widget.mapDef.walls,
+                                // Repaints every frame while the snake
+                                // glides; keep that off the glass panels.
+                                RepaintBoundary(
+                                  child: CustomPaint(
+                                    painter: _SnakeBoardPainter(
+                                      snake: snake,
+                                      prevSnake: prevSnake,
+                                      progress: _moveAnim,
+                                      tongueOut: moves % 10 < 2,
+                                      food: food,
+                                      walls: widget.mapDef.walls,
+                                    ),
                                   ),
                                 ),
                                 if (isPaused)
@@ -954,19 +1008,34 @@ class _SnakeGamePageState extends State<SnakeGamePage> {
 
 class _SnakeBoardPainter extends CustomPainter {
   final List<Point<int>> snake;
+  final List<Point<int>> prevSnake;
+
+  /// 0 right after a move, reaching 1 by the next one.
+  final Animation<double> progress;
+  final bool tongueOut;
   final Point<int> food;
   final Set<Point<int>> walls;
 
   _SnakeBoardPainter({
     required this.snake,
+    required this.prevSnake,
+    required this.progress,
+    required this.tongueOut,
     required this.food,
     required this.walls,
-  });
+  }) : super(repaint: progress);
+
+  static const _headColor = Color(0xFF8BF26B);
+  static const _tailColor = Color(0xFF1F7A45);
+  static const _outlineColor = Color(0xFF062B17);
+  static const _spotColor = Color(0xFF145C34);
+  static const _tongueColor = Color(0xFFFF3B5C);
 
   @override
   void paint(Canvas canvas, Size size) {
     final cellW = size.width / kSnakeCols;
     final cellH = size.height / kSnakeRows;
+    canvas.clipRect(Offset.zero & size);
 
     canvas.drawRect(
       Offset.zero & size,
@@ -1005,43 +1074,228 @@ class _SnakeBoardPainter extends CustomPainter {
       );
     }
 
-    final foodCenter = Offset((food.x + 0.5) * cellW, (food.y + 0.5) * cellH);
+    final t = progress.value;
+    final grew = snake.length > prevSnake.length;
     final foodRadius = min(cellW, cellH) * 0.35;
+    _paintFood(canvas, food, foodRadius, cellW, cellH);
+    // The food just eaten shrinks away as the head slides over it.
+    if (grew && t < 1) {
+      _paintFood(canvas, snake.first, foodRadius * (1 - t), cellW, cellH);
+    }
+
+    _paintSnake(canvas, cellW, cellH, t, grew);
+  }
+
+  void _paintFood(
+    Canvas canvas,
+    Point<int> at,
+    double radius,
+    double cellW,
+    double cellH,
+  ) {
+    final center = Offset((at.x + 0.5) * cellW, (at.y + 0.5) * cellH);
     canvas.drawCircle(
-      foodCenter,
-      foodRadius * 1.8,
+      center,
+      radius * 1.8,
       Paint()
         ..color = Colors.pinkAccent.withValues(alpha: 0.5)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
     );
-    canvas.drawCircle(foodCenter, foodRadius, Paint()..color = Colors.pinkAccent);
+    canvas.drawCircle(center, radius, Paint()..color = Colors.pinkAccent);
+  }
 
-    for (int i = 0; i < snake.length; i++) {
-      final seg = snake[i];
-      final isHead = i == 0;
-      final rect = Rect.fromLTWH(
-        seg.x * cellW + 1.5,
-        seg.y * cellH + 1.5,
-        cellW - 3,
-        cellH - 3,
-      );
-      final rrect = RRect.fromRectAndRadius(
-        rect,
-        Radius.circular(isHead ? 6 : 4),
-      );
-      final t = snake.length <= 1 ? 1.0 : 1 - (i / snake.length) * 0.5;
-      final color = Color.lerp(Colors.cyanAccent, const Color(0xFF00695C), 1 - t)!;
+  /// One step between neighbouring cells, -1/0/1 per axis, taking the short
+  /// way across a wrapped board edge.
+  static Offset _step(Point<int> from, Point<int> to) {
+    var dx = to.x - from.x;
+    var dy = to.y - from.y;
+    if (dx > 1) dx -= kSnakeCols;
+    if (dx < -1) dx += kSnakeCols;
+    if (dy > 1) dy -= kSnakeRows;
+    if (dy < -1) dy += kSnakeRows;
+    return Offset(dx.toDouble(), dy.toDouble());
+  }
 
-      if (isHead) {
-        canvas.drawRRect(
-          rrect,
-          Paint()
-            ..color = Colors.cyanAccent.withValues(alpha: 0.5)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+  void _paintSnake(
+    Canvas canvas,
+    double cellW,
+    double cellH,
+    double t,
+    bool grew,
+  ) {
+    final n = snake.length;
+    if (n < 2) return;
+
+    // Cell positions along the body, unwrapped so it stays in one piece where
+    // it crosses a board edge.
+    final cells = [Offset(snake[0].x.toDouble(), snake[0].y.toDouble())];
+    for (int i = 1; i < n; i++) {
+      cells.add(cells[i - 1] + _step(snake[i - 1], snake[i]));
+    }
+    final oldTail = grew
+        ? cells.last
+        : cells.last + _step(snake.last, prevSnake.last);
+
+    // The head glides into its new cell and the tail out of its old one.
+    final path = [
+      Offset.lerp(cells[1], cells[0], t)!,
+      ...cells.skip(1),
+      if (!grew) Offset.lerp(oldTail, cells.last, t)!,
+    ];
+
+    // Each body segment slides from where the one behind it was, so its
+    // markings move with the body instead of jumping cell to cell.
+    final markings = <Offset>[];
+    for (int j = 1; j < n - 1; j++) {
+      final from = cells[j + 1];
+      final at = Offset.lerp(from, cells[j], t)!;
+      final along = cells[j] - from;
+      final side = Offset(-along.dy, along.dx) * (j.isEven ? 0.17 : -0.17);
+      markings.add(at + side);
+    }
+
+    var minX = path.first.dx, maxX = minX;
+    var minY = path.first.dy, maxY = minY;
+    for (final p in path) {
+      minX = min(minX, p.dx);
+      maxX = max(maxX, p.dx);
+      minY = min(minY, p.dy);
+      maxY = max(maxY, p.dy);
+    }
+    // Draw it once per board-sized shift that lands on the board, so a snake
+    // passing through an edge shows on both sides. The head and tongue reach
+    // this many cells past a cell center.
+    const reach = 1.6;
+    final firstKx = ((minX + 0.5 - reach) / kSnakeCols).floor();
+    final lastKx = ((maxX + 0.5 + reach) / kSnakeCols).floor();
+    final firstKy = ((minY + 0.5 - reach) / kSnakeRows).floor();
+    final lastKy = ((maxY + 0.5 + reach) / kSnakeRows).floor();
+    for (int kx = firstKx; kx <= lastKx; kx++) {
+      for (int ky = firstKy; ky <= lastKy; ky++) {
+        final shift = Offset(
+          -kx * kSnakeCols.toDouble(),
+          -ky * kSnakeRows.toDouble(),
+        );
+        _paintSnakeBody(
+          canvas,
+          path,
+          markings,
+          cells[0] - cells[1],
+          shift,
+          cellW,
+          cellH,
         );
       }
-      canvas.drawRRect(rrect, Paint()..color = color);
     }
+  }
+
+  /// [heading] is the direction of the last move, one cell long. (Not taken
+  /// from [path]: right after a move its first two points coincide.)
+  void _paintSnakeBody(
+    Canvas canvas,
+    List<Offset> path,
+    List<Offset> markings,
+    Offset heading,
+    Offset shift,
+    double cellW,
+    double cellH,
+  ) {
+    Offset px(Offset c) =>
+        Offset((c.dx + shift.dx + 0.5) * cellW, (c.dy + shift.dy + 0.5) * cellH);
+    final base = min(cellW, cellH);
+    final pts = [for (final p in path) px(p)];
+    final last = pts.length - 1;
+    // Full width along the front, narrowing to a point at the tail.
+    double widthAt(int i) {
+      final f = (i / last).clamp(0.0, 1.0);
+      return base * (f < 0.45 ? 0.74 : 0.74 - (f - 0.45) / 0.55 * 0.62);
+    }
+
+    // A tube through the points: a round joint at each one and a tapered
+    // quad between neighbours.
+    void drawTube(double extra, Color Function(int i) colorAt) {
+      final paint = Paint();
+      for (int i = 0; i <= last; i++) {
+        final wa = widthAt(i) + extra;
+        paint.color = colorAt(i);
+        canvas.drawCircle(pts[i], wa / 2, paint);
+        if (i == last) break;
+        final a = pts[i];
+        final b = pts[i + 1];
+        final d = b - a;
+        if (d.distance < 0.01) continue;
+        final nrm = Offset(-d.dy, d.dx) / d.distance;
+        final wb = widthAt(i + 1) + extra;
+        canvas.drawPath(
+          Path()
+            ..moveTo(a.dx + nrm.dx * wa / 2, a.dy + nrm.dy * wa / 2)
+            ..lineTo(b.dx + nrm.dx * wb / 2, b.dy + nrm.dy * wb / 2)
+            ..lineTo(b.dx - nrm.dx * wb / 2, b.dy - nrm.dy * wb / 2)
+            ..lineTo(a.dx - nrm.dx * wa / 2, a.dy - nrm.dy * wa / 2)
+            ..close(),
+          paint,
+        );
+      }
+    }
+
+    drawTube(base * 0.12, (_) => _outlineColor);
+    drawTube(0, (i) => Color.lerp(_headColor, _tailColor, i / last)!);
+
+    final shine = Offset(-1, -1) * (base * 0.1);
+    final stroke = Paint()
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withValues(alpha: 0.16);
+    for (int k = 0; k < last - 1; k++) {
+      stroke.strokeWidth = widthAt(k) * 0.3;
+      canvas.drawLine(pts[k] + shine, pts[k + 1] + shine, stroke);
+    }
+    final spotPaint = Paint()..color = _spotColor;
+    for (int j = 0; j < markings.length; j++) {
+      canvas.drawCircle(px(markings[j]), widthAt(j + 1) * 0.17, spotPaint);
+    }
+
+    _paintHead(canvas, pts.first, atan2(heading.dy, heading.dx), base);
+  }
+
+  void _paintHead(Canvas canvas, Offset center, double angle, double base) {
+    final r = base * 0.46;
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(angle);
+
+    if (tongueOut) {
+      final tongue = Paint()
+        ..color = _tongueColor
+        ..strokeWidth = max(1.5, base * 0.07)
+        ..strokeCap = StrokeCap.round;
+      final fork = Offset(r * 2.0, 0);
+      canvas.drawLine(Offset(r * 1.2, 0), fork, tongue);
+      canvas.drawLine(fork, fork + Offset(r * 0.32, -r * 0.24), tongue);
+      canvas.drawLine(fork, fork + Offset(r * 0.32, r * 0.24), tongue);
+    }
+
+    final head = Rect.fromCenter(
+      center: Offset(r * 0.2, 0),
+      width: r * 2.5,
+      height: r * 2.0,
+    );
+    canvas.drawOval(
+      head.inflate(r * 0.15),
+      Paint()
+        ..color = _headColor.withValues(alpha: 0.35)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    canvas.drawOval(head.inflate(base * 0.06), Paint()..color = _outlineColor);
+    canvas.drawOval(head, Paint()..color = _headColor);
+
+    final white = Paint()..color = Colors.white;
+    final pupil = Paint()..color = Colors.black;
+    for (final side in [-1.0, 1.0]) {
+      final eye = Offset(r * 0.6, side * r * 0.48);
+      canvas.drawCircle(eye, r * 0.3, white);
+      canvas.drawCircle(eye + Offset(r * 0.1, 0), r * 0.16, pupil);
+    }
+    canvas.restore();
   }
 
   @override

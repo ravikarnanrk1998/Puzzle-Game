@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../ui/ambient_background.dart';
 import '../ui/glass_panel.dart';
+import 'diamonds.dart';
 import 'store_service.dart';
 
 class _PackInfo {
@@ -13,6 +14,51 @@ class _PackInfo {
   const _PackInfo(this.id, this.title, this.subtitle, this.icon, this.color);
 }
 
+const _diamondPacks = [
+  _PackInfo(
+    StoreIds.diamonds10,
+    '10 Diamonds',
+    'Unlock 1 level',
+    Icons.diamond,
+    kDiamondColor,
+  ),
+  _PackInfo(
+    StoreIds.diamonds20,
+    '20 Diamonds',
+    'Unlock 2 levels',
+    Icons.diamond,
+    kDiamondColor,
+  ),
+  _PackInfo(
+    StoreIds.diamonds30,
+    '30 Diamonds',
+    'Unlock 3 levels',
+    Icons.diamond,
+    kDiamondColor,
+  ),
+  _PackInfo(
+    StoreIds.diamonds50,
+    '50 Diamonds',
+    'Unlock 5 levels',
+    Icons.diamond,
+    kDiamondColor,
+  ),
+  _PackInfo(
+    StoreIds.diamonds100,
+    '100 Diamonds',
+    'Unlock 10 levels',
+    Icons.diamond,
+    kDiamondColor,
+  ),
+  _PackInfo(
+    StoreIds.diamonds500,
+    '500 Diamonds',
+    'Best value',
+    Icons.diamond,
+    kDiamondColor,
+  ),
+];
+
 const _hammerPacks = [
   _PackInfo(
     StoreIds.hammers10,
@@ -22,8 +68,29 @@ const _hammerPacks = [
     Colors.cyanAccent,
   ),
   _PackInfo(
+    StoreIds.hammers20,
+    '20 Hammers',
+    'Smash 20 blocks',
+    Icons.build,
+    Colors.cyanAccent,
+  ),
+  _PackInfo(
+    StoreIds.hammers30,
+    '30 Hammers',
+    'Smash 30 blocks',
+    Icons.build,
+    Colors.cyanAccent,
+  ),
+  _PackInfo(
     StoreIds.hammers50,
     '50 Hammers',
+    'Smash 50 blocks',
+    Icons.build,
+    Colors.cyanAccent,
+  ),
+  _PackInfo(
+    StoreIds.hammers100,
+    '100 Hammers',
     'Best value',
     Icons.build,
     Colors.cyanAccent,
@@ -39,8 +106,29 @@ const _hintPacks = [
     Colors.amberAccent,
   ),
   _PackInfo(
+    StoreIds.hints20,
+    '20 Hints',
+    'Reveal 20 cells',
+    Icons.lightbulb,
+    Colors.amberAccent,
+  ),
+  _PackInfo(
+    StoreIds.hints30,
+    '30 Hints',
+    'Reveal 30 cells',
+    Icons.lightbulb,
+    Colors.amberAccent,
+  ),
+  _PackInfo(
     StoreIds.hints50,
     '50 Hints',
+    'Reveal 50 cells',
+    Icons.lightbulb,
+    Colors.amberAccent,
+  ),
+  _PackInfo(
+    StoreIds.hints100,
+    '100 Hints',
     'Best value',
     Icons.lightbulb,
     Colors.amberAccent,
@@ -107,15 +195,18 @@ class StorePage extends StatelessWidget {
         ),
       ];
     }
-    if (!store.storeAvailable || store.products.isEmpty) {
-      return [
-        _message(
+    // Every pack is always listed; one Google Play doesn't return (not
+    // created in Play Console yet, or no connection) shows as unavailable.
+    return [
+      if (!store.storeAvailable || store.products.isEmpty) ...[
+        _notice(
+          Icons.cloud_off,
+          Colors.orangeAccent,
           store.storeAvailable
-              ? 'No items available right now.'
+              ? 'Prices could not be loaded from Google Play.'
               : 'Could not connect to the store. Check your connection and '
                     'that you are signed in to Google Play.',
         ),
-        const SizedBox(height: 12),
         Center(
           child: TextButton.icon(
             onPressed: store.retry,
@@ -123,27 +214,28 @@ class StorePage extends StatelessWidget {
             label: const Text('Try again'),
           ),
         ),
-      ];
-    }
-
-    final premium = store.product(StoreIds.premium);
-    return [
-      if (premium != null) ...[
-        _PremiumCard(product: premium, owned: store.isPremium),
-        const SizedBox(height: 26),
+        const SizedBox(height: 16),
       ],
+      _PremiumCard(
+        product: store.product(StoreIds.premium),
+        owned: store.isPremium,
+      ),
+      const SizedBox(height: 26),
+      ..._section(store, 'DIAMONDS', _diamondPacks),
       ..._section(store, 'HAMMERS', _hammerPacks),
       ..._section(store, 'SUDOKU HINTS', _hintPacks),
-      const SizedBox(height: 10),
-      Center(
-        child: TextButton(
-          onPressed: store.restore,
-          child: const Text(
-            'Restore Purchases',
-            style: TextStyle(color: Colors.white70),
+      if (store.storeAvailable) ...[
+        const SizedBox(height: 10),
+        Center(
+          child: TextButton(
+            onPressed: store.restore,
+            child: const Text(
+              'Restore Purchases',
+              style: TextStyle(color: Colors.white70),
+            ),
           ),
         ),
-      ),
+      ],
     ];
   }
 
@@ -152,11 +244,6 @@ class StorePage extends StatelessWidget {
     String title,
     List<_PackInfo> packs,
   ) {
-    final available = [
-      for (final pack in packs)
-        if (store.product(pack.id) != null) pack,
-    ];
-    if (available.isEmpty) return [];
     return [
       Text(
         title,
@@ -168,8 +255,8 @@ class StorePage extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 10),
-      for (final pack in available) ...[
-        _PackTile(info: pack, product: store.product(pack.id)!),
+      for (final pack in packs) ...[
+        _PackTile(info: pack, product: store.product(pack.id)),
         const SizedBox(height: 12),
       ],
       const SizedBox(height: 14),
@@ -242,11 +329,7 @@ class _WalletBar extends StatelessWidget {
 
     return Row(
       children: [
-        chip(
-          store.isPremium ? Icons.workspace_premium : Icons.lock_outline,
-          Colors.pinkAccent,
-          store.isPremium ? 'Premium' : 'Free',
-        ),
+        chip(Icons.diamond, kDiamondColor, '${store.diamonds}'),
         const SizedBox(width: 12),
         chip(Icons.build, Colors.cyanAccent, '${store.hammers}'),
         const SizedBox(width: 12),
@@ -257,12 +340,14 @@ class _WalletBar extends StatelessWidget {
 }
 
 class _PremiumCard extends StatelessWidget {
-  final ProductDetails product;
+  /// Null when Google Play didn't return the product.
+  final ProductDetails? product;
   final bool owned;
   const _PremiumCard({required this.product, required this.owned});
 
   @override
   Widget build(BuildContext context) {
+    final product = this.product;
     Widget perk(String text) => Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -322,7 +407,7 @@ class _PremiumCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          perk('Unlock all 8 premium Snake maps'),
+          perk('Unlock all 8 premium Snake maps and every locked level'),
           perk('5 free hammers every Block Puzzle game (instead of 3)'),
           perk('5 free hints every Sudoku puzzle (instead of 3)'),
           perk('One-time purchase, yours forever'),
@@ -330,7 +415,7 @@ class _PremiumCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: owned
+              onPressed: owned || product == null
                   ? null
                   : () => StoreService.instance.buy(product),
               style: ElevatedButton.styleFrom(
@@ -341,7 +426,11 @@ class _PremiumCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: Text(
-                owned ? 'OWNED' : 'GET PREMIUM - ${product.price}',
+                owned
+                    ? 'OWNED'
+                    : product == null
+                    ? 'UNAVAILABLE'
+                    : 'GET PREMIUM - ${product.price}',
                 style: const TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
@@ -354,11 +443,14 @@ class _PremiumCard extends StatelessWidget {
 
 class _PackTile extends StatelessWidget {
   final _PackInfo info;
-  final ProductDetails product;
+
+  /// Null when Google Play didn't return the product.
+  final ProductDetails? product;
   const _PackTile({required this.info, required this.product});
 
   @override
   Widget build(BuildContext context) {
+    final product = this.product;
     return GlassPanel(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       borderRadius: BorderRadius.circular(18),
@@ -400,13 +492,17 @@ class _PackTile extends StatelessWidget {
             ),
           ),
           ElevatedButton(
-            onPressed: () => StoreService.instance.buy(product),
+            onPressed: product == null
+                ? null
+                : () => StoreService.instance.buy(product),
             style: ElevatedButton.styleFrom(
               backgroundColor: info.color,
               foregroundColor: Colors.black,
+              disabledBackgroundColor: Colors.white12,
+              disabledForegroundColor: Colors.white54,
             ),
             child: Text(
-              product.price,
+              product?.price ?? 'Unavailable',
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),

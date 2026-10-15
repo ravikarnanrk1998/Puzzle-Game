@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'store/diamonds.dart';
+import 'store/store_service.dart';
 import 'ui/ambient_background.dart';
 import 'ui/glass_panel.dart';
 import 'ui/result_dialog.dart';
@@ -46,7 +48,16 @@ class _JigsawLevelSelectPageState extends State<JigsawLevelSelectPage> {
     setState(() => _customImage = bytes);
   }
 
-  void _openLevel(int gridSize) {
+  Future<void> _openLevel(int gridSize, String title, String? lockId) async {
+    if (lockId != null &&
+        !await confirmDiamondUnlock(
+          context,
+          lockId: lockId,
+          name: 'Jigsaw $title',
+        )) {
+      return;
+    }
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -68,81 +79,89 @@ class _JigsawLevelSelectPageState extends State<JigsawLevelSelectPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.white,
+        actions: const [
+          DiamondBalance(),
+          SizedBox(width: 12),
+        ],
       ),
       body: AmbientGlowBackground(
         gradientColors: const [Color(0xFF1B0B2E), Color(0xFF3A1258)],
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 60),
-                    GestureDetector(
-                      onTap: _pickPhoto,
-                      child: GlassPanel(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        glowColor: Colors.purpleAccent,
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.photo_library,
-                              color: Colors.purpleAccent,
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Text(
-                                _customImage != null
-                                    ? 'Custom photo selected'
-                                    : 'Upload a photo (optional)',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+          child: ListenableBuilder(
+            listenable: StoreService.instance,
+            builder: (context, _) => Center(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 60),
+                      GestureDetector(
+                        onTap: _pickPhoto,
+                        child: GlassPanel(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          glowColor: Colors.purpleAccent,
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.photo_library,
+                                color: Colors.purpleAccent,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  _customImage != null
+                                      ? 'Custom photo selected'
+                                      : 'Upload a photo (optional)',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            ),
-                            if (_previewImage != null)
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.memory(
-                                  _previewImage!,
-                                  width: 40,
-                                  height: 40,
-                                  fit: BoxFit.cover,
+                              if (_previewImage != null)
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.memory(
+                                    _previewImage!,
+                                    width: 40,
+                                    height: 40,
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 30),
-                    _levelCard(
-                      gridSize: 4,
-                      title: 'Easy',
-                      subtitle: '4x4 - 16 pieces',
-                      color: const Color(0xFF00E676),
-                    ),
-                    const SizedBox(height: 20),
-                    _levelCard(
-                      gridSize: 6,
-                      title: 'Medium',
-                      subtitle: '6x6 - 36 pieces',
-                      color: const Color(0xFF00C9FF),
-                    ),
-                    const SizedBox(height: 20),
-                    _levelCard(
-                      gridSize: 8,
-                      title: 'Hard',
-                      subtitle: '8x8 - 64 pieces',
-                      color: const Color(0xFFD500F9),
-                    ),
-                  ],
+                      const SizedBox(height: 30),
+                      _levelCard(
+                        gridSize: 4,
+                        title: 'Easy',
+                        subtitle: '4x4 - 16 pieces',
+                        color: const Color(0xFF00E676),
+                      ),
+                      const SizedBox(height: 20),
+                      _levelCard(
+                        gridSize: 6,
+                        title: 'Medium',
+                        subtitle: '6x6 - 36 pieces',
+                        color: const Color(0xFF00C9FF),
+                      ),
+                      const SizedBox(height: 20),
+                      _levelCard(
+                        gridSize: 8,
+                        title: 'Hard',
+                        subtitle: '8x8 - 64 pieces',
+                        color: const Color(0xFFD500F9),
+                        lockId: LockIds.jigsawHard,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -157,9 +176,12 @@ class _JigsawLevelSelectPageState extends State<JigsawLevelSelectPage> {
     required String title,
     required String subtitle,
     required Color color,
+    String? lockId,
   }) {
+    final locked =
+        lockId != null && !StoreService.instance.isUnlocked(lockId);
     return GestureDetector(
-      onTap: () => _openLevel(gridSize),
+      onTap: () => _openLevel(gridSize, title, lockId),
       child: GlassPanel(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         borderRadius: BorderRadius.circular(22),
@@ -210,7 +232,17 @@ class _JigsawLevelSelectPageState extends State<JigsawLevelSelectPage> {
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: color, size: 20),
+            if (locked)
+              const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock, color: Colors.white70, size: 20),
+                  SizedBox(height: 4),
+                  DiamondPrice(StoreService.unlockCost),
+                ],
+              )
+            else
+              Icon(Icons.arrow_forward_ios, color: color, size: 20),
           ],
         ),
       ),

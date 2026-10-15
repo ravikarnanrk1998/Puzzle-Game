@@ -9,6 +9,7 @@ import 'snake_game.dart';
 import 'classic_block_puzzle.dart';
 import 'sudoku_game.dart';
 import 'jigsaw_puzzle.dart';
+import 'store/diamonds.dart';
 import 'store/store_page.dart';
 import 'store/store_service.dart';
 import 'ui/ambient_background.dart';
@@ -163,8 +164,11 @@ class _MainMenuPageState extends State<MainMenuPage>
             ),
             const SizedBox(height: 10),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(context);
+                if (!await _unlockSliding5x5(context) || !context.mounted) {
+                  return;
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -173,7 +177,10 @@ class _MainMenuPageState extends State<MainMenuPage>
                   ),
                 );
               },
-              child: const Text('New Game 5x5'),
+              child: const LockedLabel(
+                'New Game 5x5',
+                lockId: LockIds.sliding5x5,
+              ),
             ),
             const Divider(color: Colors.white24, height: 30),
             ElevatedButton.icon(
@@ -194,6 +201,12 @@ class _MainMenuPageState extends State<MainMenuPage>
       ),
     );
   }
+
+  Future<bool> _unlockSliding5x5(BuildContext context) => confirmDiamondUnlock(
+    context,
+    lockId: LockIds.sliding5x5,
+    name: 'Sliding Puzzle 5x5',
+  );
 
   Future<void> _openPhotoPuzzleFlow(BuildContext context) async {
     final result = await FilePicker.platform.pickFiles(
@@ -222,8 +235,10 @@ class _MainMenuPageState extends State<MainMenuPage>
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   Navigator.pop(context);
+                  if (size == 5 && !await _unlockSliding5x5(context)) return;
+                  if (!context.mounted) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -234,7 +249,9 @@ class _MainMenuPageState extends State<MainMenuPage>
                     ),
                   );
                 },
-                child: Text('${size}x$size'),
+                child: size == 5
+                    ? const LockedLabel('5x5', lockId: LockIds.sliding5x5)
+                    : Text('${size}x$size'),
               ),
             );
           }).toList(),
@@ -601,6 +618,12 @@ class _MainMenuPageState extends State<MainMenuPage>
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1,
                   ),
+                ),
+                const SizedBox(width: 10),
+                DiamondPrice(
+                  StoreService.instance.diamonds,
+                  size: 15,
+                  color: Colors.white,
                 ),
               ],
             ),

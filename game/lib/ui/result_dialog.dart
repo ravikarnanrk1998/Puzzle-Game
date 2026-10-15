@@ -18,6 +18,9 @@ class ResultDialog extends StatefulWidget {
   final String secondaryLabel;
   final VoidCallback onSecondary;
 
+  /// Shown above the primary button, e.g. a paid "continue".
+  final Widget? extraAction;
+
   const ResultDialog({
     super.key,
     required this.icon,
@@ -28,6 +31,7 @@ class ResultDialog extends StatefulWidget {
     required this.onPrimary,
     required this.secondaryLabel,
     required this.onSecondary,
+    this.extraAction,
   });
 
   @override
@@ -175,6 +179,10 @@ class _ResultDialogState extends State<ResultDialog> {
                     ),
                   ),
                   const SizedBox(height: 26),
+                  if (widget.extraAction != null) ...[
+                    widget.extraAction!,
+                    const SizedBox(height: 12),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(

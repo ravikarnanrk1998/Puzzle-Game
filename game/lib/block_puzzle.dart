@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'store/diamonds.dart';
 import 'store/store_page.dart';
 import 'store/store_service.dart';
 import 'ui/ambient_background.dart';
@@ -381,7 +382,6 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
     );
     setState(() {});
     _saveGame();
-    _checkGameOver();
   }
 
   bool _canPlaceShape(ShapeDef shapeDef, int startRow, int startCol) {
@@ -569,51 +569,148 @@ class _BlockPuzzlePageState extends State<BlockPuzzlePage> {
     }
   }
 
-  void _checkGameOver() {
-    bool hasMove = false;
-    for (var shapeDef in availableShapes) {
+  bool _hasAnyMove() {
+    for (final shapeDef in availableShapes) {
       if (shapeDef == null) continue;
       for (int r = 0; r < boardSize; r++) {
         for (int c = 0; c < boardSize; c++) {
-          if (_canPlaceShape(shapeDef, r, c)) {
-            hasMove = true;
-            break;
-          }
+          if (_canPlaceShape(shapeDef, r, c)) return true;
         }
-        if (hasMove) break;
       }
-      if (hasMove) break;
     }
+    return false;
+  }
 
-    if (!hasMove && availableShapes.any((s) => s != null)) {
-      _clearSave();
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => ResultDialog(
-            icon: Icons.sentiment_dissatisfied_rounded,
-            accentColor: Colors.pinkAccent,
-            title: 'GAME OVER',
-            stats: [
-              ResultStat('SCORE', '$score', highlight: true),
-              ResultStat('BEST', '$highScore'),
-            ],
-            primaryLabel: 'PLAY AGAIN',
-            onPrimary: () {
-              Navigator.of(context).pop();
-              _initGame();
-            },
-            secondaryLabel: 'Main Menu',
-            onSecondary: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-          ),
-        );
-      });
+  /// Rows emptied when the player pays to continue. Three empty full-width
+  /// rows fit every shape up to 3 tall, including the 5-long bar lying down.
+  static const _continueRows = [3, 4, 5];
+
+  Future<void> _continueGame() async {
+    if (!StoreService.instance.spendDiamonds(StoreService.continueCost)) {
+      openStore(context);
+      return;
     }
+    Navigator.of(context).pop();
+
+    final cells = [
+      for (final r in _continueRows)
+        for (int c = 0; c < boardSize; c++)
+          if (board[r][c] != null) (r, c),
+    ];
+    setState(() {
+      _isAnimating = true;
+      for (final (r, c) in cells) {
+        isClearing[r][c] = true;
+      }
+    });
+    await Future.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
+    setState(() {
+      for (final (r, c) in cells) {
+        board[r][c] = null;
+        isClearing[r][c] = false;
+      }
+      _isAnimating = false;
+    });
+
+    // Only possible if every shape left is a bar standing 4 or 5 tall.
+    if (!_hasAnyMove()) {
+      _generateShapes();
+    } else {
+      _saveGame();
+    }
+    _checkGameOver();
+  }
+
+  Widget _buildContinueButton() {
+    return ListenableBuilder(
+      listenable: StoreService.instance,
+      builder: (context, _) => Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _continueGame,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kDiamondColor,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                elevation: 8,
+                shadowColor: kDiamondColor.withValues(alpha: 0.6),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'CONTINUE  ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  DiamondPrice(
+                    StoreService.continueCost,
+                    size: 18,
+                    color: Colors.black,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Clears 3 rows  ·  You have ',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
+              ),
+              DiamondPrice(StoreService.instance.diamonds, size: 12),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _checkGameOver() {
+    if (_hasAnyMove() || availableShapes.every((s) => s == null)) return;
+
+    _clearSave();
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ResultDialog(
+          icon: Icons.sentiment_dissatisfied_rounded,
+          accentColor: Colors.pinkAccent,
+          title: 'GAME OVER',
+          stats: [
+            ResultStat('SCORE', '$score', highlight: true),
+            ResultStat('BEST', '$highScore'),
+          ],
+          extraAction: slotCount == 6 ? _buildContinueButton() : null,
+          primaryLabel: 'PLAY AGAIN',
+          onPrimary: () {
+            Navigator.of(context).pop();
+            _initGame();
+          },
+          secondaryLabel: 'Main Menu',
+          onSecondary: () {
+            Navigator.of(context).pop();
+            Navigator.of(context).pop();
+          },
+        ),
+      );
+    });
   }
 
   Widget _buildShapeGrid(ShapeDef shapeDef, {double cellSize = 18.0}) {

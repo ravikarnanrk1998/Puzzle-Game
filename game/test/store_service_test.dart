@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:game/snake_game.dart';
 import 'package:game/store/store_service.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -97,5 +98,86 @@ void main() {
     expect(store.useHammer(), isFalse);
     expect(store.hammers, 0);
     expect(store.useHint(), isFalse);
+  });
+
+  test('hammers, hints and diamonds each sell 10/20/30/50/100 packs', () {
+    for (final item in StoreItem.values) {
+      final sizes = [
+        for (final (i, n) in kConsumableGrants.values)
+          if (i == item) n,
+      ];
+      expect(sizes, containsAll([10, 20, 30, 50, 100]), reason: item.name);
+    }
+    expect(StoreIds.all, containsAll(kConsumableGrants.keys));
+  });
+
+  test('every pack grants its amount and it is saved', () async {
+    for (final MapEntry(key: id, value: (item, amount))
+        in kConsumableGrants.entries) {
+      final before = (store.hammers, store.hints, store.diamonds);
+      await store.handlePurchases([_purchase(id, id: 'GPA.$id')]);
+      final expected = switch (item) {
+        StoreItem.hammer => (before.$1 + amount, before.$2, before.$3),
+        StoreItem.hint => (before.$1, before.$2 + amount, before.$3),
+        StoreItem.diamond => (before.$1, before.$2, before.$3 + amount),
+      };
+      expect((store.hammers, store.hints, store.diamonds), expected,
+          reason: id);
+    }
+    expect(store.hammers, 210);
+    expect(store.hints, 210);
+    expect(store.diamonds, 710);
+
+    await store.loadLocal();
+    expect((store.hammers, store.hints, store.diamonds), (210, 210, 710));
+  });
+
+  test('unlocking costs 10 diamonds once and is saved', () async {
+    await store.handlePurchases([_purchase(StoreIds.diamonds20, id: 'GPA.9')]);
+    expect(store.isUnlocked(LockIds.sudoku9x9), isFalse);
+
+    expect(store.unlock(LockIds.sudoku9x9), isTrue);
+    expect(store.diamonds, 10);
+    expect(store.unlock(LockIds.sudoku9x9), isTrue);
+    expect(store.diamonds, 10, reason: 'already unlocked, no second charge');
+
+    await store.loadLocal();
+    expect(store.isUnlocked(LockIds.sudoku9x9), isTrue);
+    expect(store.isUnlocked(LockIds.jigsawHard), isFalse);
+  });
+
+  test('unlocking needs enough diamonds', () async {
+    await store.handlePurchases([_purchase(StoreIds.diamonds10, id: 'GPA.10')]);
+    expect(store.spendDiamonds(StoreService.continueCost), isTrue);
+    expect(store.diamonds, 9);
+
+    expect(store.unlock(LockIds.jigsawHard), isFalse);
+    expect(store.isUnlocked(LockIds.jigsawHard), isFalse);
+    expect(store.diamonds, 9);
+  });
+
+  test('locked snake maps unlock with diamonds', () async {
+    final echo = kSnakeMaps.firstWhere((m) => m.id == 'echo');
+    final classic = kSnakeMaps.firstWhere((m) => m.id == 'classic');
+    expect(classic.locked, isFalse);
+    expect(echo.locked, isTrue);
+
+    await store.handlePurchases([_purchase(StoreIds.diamonds10, id: 'GPA.11')]);
+    expect(store.unlock(LockIds.snakeMap(echo.id)), isTrue);
+    expect(echo.locked, isFalse);
+    expect(store.diamonds, 0);
+  });
+
+  test('premium unlocks every locked level without diamonds', () async {
+    await store.handlePurchases([_purchase(StoreIds.premium, id: 'GPA.12')]);
+    for (final id in [
+      LockIds.sliding5x5,
+      LockIds.jigsawHard,
+      LockIds.sudoku9x9,
+      LockIds.snakeMap('alleys'),
+    ]) {
+      expect(store.isUnlocked(id), isTrue, reason: id);
+    }
+    expect(store.diamonds, 0);
   });
 }
