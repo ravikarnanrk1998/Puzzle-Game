@@ -4,6 +4,7 @@ import 'package:bike/shop/player_progress.dart';
 import 'package:bike/shop/store_service.dart';
 import 'package:bike/versus/match_backend.dart';
 import 'package:bike/versus/versus_match.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes.dart';
@@ -91,9 +92,13 @@ void main() {
       guest.finish(300);
       await pumpEventQueue();
       host.report(300);
-      expect(host.outcome, isNull, reason: 'level is not ahead yet');
+      expect(host.decided, isFalse, reason: 'level is not ahead yet');
       host.report(301);
+      expect(host.decided, isTrue, reason: 'the run ends straight away');
+      await pumpEventQueue();
       expect(host.outcome, VersusOutcome.win);
+      expect(guest.outcome, VersusOutcome.lose);
+      expect(server.matches[host.code]!.winner, 'ravi');
     });
 
     // The next two depend on the passing of time, which only testWidgets
@@ -154,7 +159,94 @@ void main() {
       await pumpEventQueue();
       expect(host.opponent!.done, isTrue);
       host.report(121);
+      await pumpEventQueue();
       expect(host.outcome, VersusOutcome.win);
+    });
+
+    // The user's report: Priya's internet is cut, Ravi is given the win,
+    // then Priya's phone comes back with a higher score and took the win
+    // from him.
+    testWidgets(
+        'a player whose connection is lost mid-run loses, and coming back '
+        'online changes nothing', (tester) async {
+      final ravisPhone = server.phone(), priyasPhone = server.phone();
+      host = await VersusMatch.create(ravisPhone, uid: 'ravi', name: 'Ravi');
+      guest = await VersusMatch.join(priyasPhone, host.code,
+          uid: 'priya', name: 'Priya');
+      open.addAll([host, guest]);
+      await tester.pump();
+      host.start();
+      guest.start();
+      host.report(1000);
+      guest.report(500);
+      await tester.pump(const Duration(seconds: 4));
+      expect(host.opponent!.score, 500);
+
+      priyasPhone.online = false;
+      // Offline, Priya's game goes on and she rides far past Ravi.
+      guest.report(5000);
+      await tester.pump(const Duration(seconds: 5));
+      expect(guest.weakConnection, isTrue, reason: 'she is warned first');
+      expect(guest.decided, isFalse);
+
+      await tester.pump(const Duration(seconds: 5));
+      expect(guest.connectionLost, isTrue);
+      expect(guest.decided, isTrue, reason: 'her run is over');
+      expect(guest.outcome, VersusOutcome.lose);
+      expect(host.decided, isFalse,
+          reason: 'she finds out before Ravi stops waiting for her');
+
+      await tester.pump(const Duration(seconds: 4));
+      expect(host.opponentLeft, isTrue);
+      expect(host.outcome, VersusOutcome.win);
+      host.finish(1000);
+      await tester.pump();
+
+      // Priya's phone reconnects and sends what it was holding back.
+      priyasPhone.online = true;
+      await tester.pump();
+      expect(host.opponent!.dropped, isTrue);
+      expect(host.outcome, VersusOutcome.win, reason: 'the result is final');
+      expect(guest.outcome, VersusOutcome.lose);
+      expect(server.matches[host.code]!.winner, 'ravi');
+      closeAll();
+    });
+
+    testWidgets("an offline phone doesn't blame the other player",
+        (tester) async {
+      final ravisPhone = server.phone(), priyasPhone = server.phone();
+      host = await VersusMatch.create(ravisPhone, uid: 'ravi', name: 'Ravi');
+      guest = await VersusMatch.join(priyasPhone, host.code,
+          uid: 'priya', name: 'Priya');
+      open.addAll([host, guest]);
+      await tester.pump();
+      host.start();
+      guest.start();
+      host.finish(800);
+      guest.report(100);
+      await tester.pump(const Duration(seconds: 2));
+
+      // Ravi has crashed and is waiting when his own internet goes.
+      ravisPhone.online = false;
+      for (var s = 0; s < 20; s++) {
+        guest.report(200 + s * 10);
+        await tester.pump(const Duration(seconds: 1));
+      }
+      expect(host.weakConnection, isTrue);
+      expect(host.opponentLeft, isFalse,
+          reason: 'Priya kept sending; it was Ravi who could not hear her');
+      expect(host.connectionLost, isFalse,
+          reason: 'his run was already over, his score already in');
+      expect(guest.decided, isFalse, reason: 'Priya can still pass 800');
+
+      ravisPhone.online = true;
+      await tester.pump(const Duration(seconds: 1));
+      expect(host.weakConnection, isFalse);
+      guest.report(801);
+      await tester.pump();
+      expect(guest.outcome, VersusOutcome.win);
+      expect(host.outcome, VersusOutcome.lose);
+      closeAll();
     });
   });
 
@@ -228,6 +320,65 @@ void main() {
     // Let the daily claim message finish showing.
     await tester.pump(const Duration(seconds: 5));
     await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('1 VS 1: losing the internet mid-run warns, then loses the match',
+      (tester) async {
+    // A phone screen, upright.
+    tester.view
+      ..physicalSize = const Size(1080, 2400)
+      ..devicePixelRatio = 2.625;
+    addTearDown(tester.view.reset);
+    final matches = FakeMatches();
+    final phone = matches.phone();
+    final progress = PlayerProgress.memory()..addDiamonds(1);
+    final account = TestAccount(CloudSave(progress, FakeSaves()));
+    await tester.pumpWidget(BikeRushApp(
+      progress: progress,
+      store: StoreService(progress, enabled: false),
+      account: account,
+      matches: phone,
+    ));
+    await account.signInWithEmail('ravi@example.com', 'secret1');
+    await tester.pump();
+    await tester.pump();
+
+    Future<void> ride(double seconds) async {
+      for (var t = 0.0; t < seconds; t += 1 / 30) {
+        await tester.pump(const Duration(milliseconds: 34));
+      }
+    }
+
+    await tester.tap(find.text('1 VS 1'));
+    await ride(0.6);
+    await tester.tap(find.text('CREATE CODE'));
+    await ride(0.2);
+    final friend = await VersusMatch.join(matches, '100000',
+        uid: 'priya', name: 'Priya');
+    friend.start();
+    await ride(3.8);
+    expect(find.text('SCORE'), findsOneWidget);
+
+    phone.online = false;
+    await ride(7);
+    expect(find.text('WEAK NETWORK'), findsOneWidget);
+    expect(find.text('SCORE'), findsOneWidget, reason: 'still riding');
+
+    await ride(5);
+    expect(find.text('YOU LOSE'), findsOneWidget);
+    expect(find.textContaining('network is not strong'), findsOneWidget);
+    expect(find.text('WEAK NETWORK'), findsNothing);
+
+    // Priya is given the win once she stops hearing from this phone.
+    await ride(3);
+    expect(friend.outcome, VersusOutcome.win);
+
+    await tester.tap(find.text('MENU'));
+    await ride(0.3);
+    expect(find.text('PLAY'), findsOneWidget);
+    friend
+      ..leave()
+      ..dispose();
   });
 
   testWidgets('creating a code costs a diamond, paid back if nobody joins',

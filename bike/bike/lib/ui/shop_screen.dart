@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../game/bike_art.dart';
+import '../game/bike_game.dart';
 import '../shop/catalog.dart';
 import '../shop/player_progress.dart';
 import '../shop/store_service.dart';
@@ -298,8 +299,9 @@ class _ShopScreenState extends State<ShopScreen> {
         const Text(
           'Creating a 1 VS 1 code costs '
           '${Catalog.versusCost} diamond. Joining a friend is free.\n'
-          'Every day you can claim '
-          '${PlayerProgress.dailyDiamonds} free diamond on the menu.',
+          'Free diamonds: ${PlayerProgress.dailyDiamonds} every day on the '
+          'menu, and 1 for every ${BikeGame.levelsPerDiamond} levels you '
+          'complete in a run.',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white38, fontSize: 12),
         ),

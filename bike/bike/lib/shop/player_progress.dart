@@ -34,6 +34,8 @@ class PlayerProgress extends ChangeNotifier {
   static const _kOwner = 'owner';
   static const _kDiamonds = 'diamonds';
   static const _kDailyClaim = 'daily_claim';
+  static const _kTracks = 'unlocked_tracks';
+  static const _kTrack = 'selected_track';
 
   /// Diamonds given by the free daily claim.
   static const dailyDiamonds = 1;
@@ -54,6 +56,12 @@ class PlayerProgress extends ChangeNotifier {
   /// The day the daily diamond was last claimed, as '2026-10-13'.
   String? dailyClaim;
 
+  /// Tracks unlocked after the first, which is always open.
+  Set<String> tracks = {};
+
+  /// The track the next run is on. Kept on this device only.
+  String trackId = Catalog.tracks.first.id;
+
   /// The account this progress belongs to. Null for progress made without
   /// signing in.
   String? owner;
@@ -64,6 +72,9 @@ class PlayerProgress extends ChangeNotifier {
   BikeSkin get selectedBike => Catalog.bike(selected);
   bool owns(BikeSkin bike) => owned.contains(bike.id);
 
+  Track get selectedTrack => Catalog.track(trackId);
+  bool hasTrack(Track track) => track.isFree || tracks.contains(track.id);
+
   SaveData get data => SaveData(
         wallet: wallet,
         diamonds: diamonds,
@@ -73,6 +84,7 @@ class PlayerProgress extends ChangeNotifier {
         selected: selected,
         delivered: [..._delivered],
         dailyClaim: dailyClaim,
+        tracks: {...tracks},
       );
 
   /// Replaces all progress, e.g. with the player's cloud save.
@@ -88,6 +100,8 @@ class PlayerProgress extends ChangeNotifier {
     _delivered
       ..clear()
       ..addAll(data.delivered);
+    tracks = {...data.tracks};
+    _checkTrack();
     this.owner = owner;
     _save();
   }
@@ -110,6 +124,15 @@ class PlayerProgress extends ChangeNotifier {
     owner = p.getString(_kOwner);
     diamonds = p.getInt(_kDiamonds) ?? 0;
     dailyClaim = p.getString(_kDailyClaim);
+    tracks = {...?p.getStringList(_kTracks)};
+    trackId = p.getString(_kTrack) ?? Catalog.tracks.first.id;
+    _checkTrack();
+  }
+
+  /// Back to the first track if the picked one is not unlocked (any more).
+  void _checkTrack() {
+    final track = selectedTrack;
+    trackId = hasTrack(track) ? track.id : Catalog.tracks.first.id;
   }
 
   void _save() {
@@ -134,6 +157,8 @@ class PlayerProgress extends ChangeNotifier {
       } else {
         p.setString(_kDailyClaim, dailyClaim);
       }
+      p.setStringList(_kTracks, tracks.toList());
+      p.setString(_kTrack, trackId);
     }
     notifyListeners();
   }
@@ -215,6 +240,40 @@ class PlayerProgress extends ChangeNotifier {
     if (!owned.add(id)) return false;
     _save();
     return true;
+  }
+
+  /// Opens [track] for good, e.g. for completing its unlock level. Returns
+  /// true if this unlocked something new.
+  bool unlockTrack(Track track) {
+    if (hasTrack(track)) return false;
+    tracks.add(track.id);
+    _save();
+    return true;
+  }
+
+  /// Buys [track] with coins, or with diamonds if [withDiamonds], and picks
+  /// it for the next run. Returns false if not possible.
+  bool buyTrack(Track track, {bool withDiamonds = false}) {
+    if (hasTrack(track)) return false;
+    if (withDiamonds) {
+      if (track.diamondPrice <= 0 || diamonds < track.diamondPrice) {
+        return false;
+      }
+      diamonds -= track.diamondPrice;
+    } else {
+      if (track.coinPrice <= 0 || wallet < track.coinPrice) return false;
+      wallet -= track.coinPrice;
+    }
+    tracks.add(track.id);
+    trackId = track.id;
+    _save();
+    return true;
+  }
+
+  void selectTrack(Track track) {
+    if (!hasTrack(track) || trackId == track.id) return;
+    trackId = track.id;
+    _save();
   }
 
   /// Returns true if this unlocked something new.

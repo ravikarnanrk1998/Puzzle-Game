@@ -74,6 +74,18 @@ void main() {
     expect(nextLaunch.selected, 'blue');
   });
 
+  test('PlayerProgress remembers unlocked stages and the one picked',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final p = await PlayerProgress.load();
+    p
+      ..unlockTrack(Catalog.track('mountain'))
+      ..selectTrack(Catalog.track('mountain'));
+    final nextLaunch = await PlayerProgress.load();
+    expect(nextLaunch.tracks, {'mountain'});
+    expect(nextLaunch.selectedTrack.id, 'mountain');
+  });
+
   group('CloudSave', () {
     late FakeSaves server;
     late PlayerProgress phone;
@@ -208,6 +220,27 @@ void main() {
       expect(phone.owns(Catalog.bike('gold')), isTrue);
       expect(server.saves['ravi']!.owned, contains('gold'),
           reason: 'the phone sends the bike again');
+    });
+
+    test('an unlocked stage follows the account and is never lost', () async {
+      final mountain = Catalog.track('mountain');
+      await cloud.attach('ravi');
+      final outOfDate = server.saves['ravi']!;
+      phone.unlockTrack(mountain);
+      await pumpEventQueue();
+      expect(server.saves['ravi']!.tracks, {'mountain'});
+      server.saves['ravi'] = outOfDate;
+      server.notify();
+      await pumpEventQueue();
+      expect(phone.hasTrack(mountain), isTrue);
+      expect(server.saves['ravi']!.tracks, {'mountain'},
+          reason: 'the phone sends the stage again');
+
+      // The same player on a new phone.
+      cloud.detach();
+      expect(phone.hasTrack(mountain), isFalse);
+      await cloud.attach('ravi');
+      expect(phone.hasTrack(mountain), isTrue);
     });
 
     test('diamonds and the daily claim follow the account', () async {

@@ -11,6 +11,7 @@ class MatchPlayer {
     required this.name,
     this.score = 0,
     this.done = false,
+    this.dropped = false,
     this.beat = 0,
   });
 
@@ -21,21 +22,32 @@ class MatchPlayer {
   /// True once this player's run is over.
   final bool done;
 
-  /// Counts up while the player is riding, so the other side can tell a
-  /// player who is still there from one whose game has closed.
+  /// True if this player's connection was lost mid-run, which loses them
+  /// the match.
+  final bool dropped;
+
+  /// Counts up while the player is in the match, so the other side can
+  /// tell a player who is still there from one whose game has closed.
   final int beat;
 
-  MatchPlayer copyWith({int? score, bool? done, int? beat}) => MatchPlayer(
+  MatchPlayer copyWith({int? score, bool? done, bool? dropped, int? beat}) =>
+      MatchPlayer(
         uid: uid,
         name: name,
         score: score ?? this.score,
         done: done ?? this.done,
+        dropped: dropped ?? this.dropped,
         beat: beat ?? this.beat,
       );
 }
 
+/// What [MatchSnapshot.winner] holds when the match was a draw.
+const drawResult = 'draw';
+
 /// A match as it stands. [guest] is null until a second player has joined.
-typedef MatchSnapshot = ({MatchPlayer host, MatchPlayer? guest});
+/// [winner] is the uid of the player who won, or [drawResult], once the
+/// match has been settled.
+typedef MatchSnapshot = ({MatchPlayer host, MatchPlayer? guest, String? winner});
 
 /// Why a match could not be created or joined, worded for the player.
 class MatchError implements Exception {
@@ -60,7 +72,15 @@ abstract class MatchBackend {
   Stream<MatchSnapshot?> watch(String code);
 
   /// Stores one player's side. Each player only ever writes their own.
-  void update(String code, MatchPlayer player, {required bool host});
+  /// Completes once the server has answered, accepted or not; while the
+  /// phone is offline it waits.
+  Future<void> update(String code, MatchPlayer player, {required bool host});
+
+  /// Records [winner] as the result of match [code], unless it already has
+  /// one: the first result to arrive is final. Returns the result the match
+  /// holds afterwards, or null if it has been closed. Throws if the server
+  /// can't be reached.
+  Future<String?> settle(String code, String winner);
 
   /// Closes the match for both players.
   Future<void> close(String code);
@@ -89,6 +109,7 @@ class FirestoreMatches implements MatchBackend {
         'name': p.name,
         'score': p.score,
         'done': p.done,
+        'dropped': p.dropped,
         'beat': p.beat,
       };
 
@@ -102,6 +123,7 @@ class FirestoreMatches implements MatchBackend {
       name: name is String ? name : 'Player',
       score: score is num ? score.toInt() : 0,
       done: side['done'] == true,
+      dropped: side['dropped'] == true,
       beat: beat is num ? beat.toInt() : 0,
     );
   }
@@ -161,17 +183,33 @@ class FirestoreMatches implements MatchBackend {
   Stream<MatchSnapshot?> watch(String code) => _doc(code).snapshots().map((doc) {
         final match = doc.data();
         final host = _read(match?['host']);
+        final winner = match?['winner'];
         return host == null
             ? null
-            : (host: host, guest: _read(match?['guest']));
+            : (
+                host: host,
+                guest: _read(match?['guest']),
+                winner: winner is String ? winner : null,
+              );
       });
 
   @override
-  void update(String code, MatchPlayer player, {required bool host}) {
-    _doc(code)
-        .update({host ? 'host' : 'guest': _write(player)}).onError<Object>(
-            (e, _) => debugPrint('Match update failed: $e'));
-  }
+  Future<void> update(String code, MatchPlayer player, {required bool host}) =>
+      // A refusal is an answer too: the server was reached.
+      _doc(code)
+          .update({host ? 'host' : 'guest': _write(player)}).onError<Object>(
+              (e, _) => debugPrint('Match update failed: $e'));
+
+  @override
+  Future<String?> settle(String code, String winner) =>
+      _db.runTransaction((tx) async {
+        final match = (await tx.get(_doc(code))).data();
+        if (match == null) return null;
+        final settled = match['winner'];
+        if (settled is String) return settled;
+        tx.update(_doc(code), {'winner': winner});
+        return winner;
+      });
 
   @override
   Future<void> close(String code) => _doc(code).delete();

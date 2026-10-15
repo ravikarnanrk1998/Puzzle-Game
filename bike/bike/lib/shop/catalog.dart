@@ -34,6 +34,40 @@ class BikeSkin {
   bool get isPremium => productId != null;
 }
 
+/// How a track looks, and for [mountain] also how it plays: the road has
+/// rocks, barriers, potholes, oil slicks and jump ramps on it.
+enum TrackTheme { highway, mountain }
+
+/// A road to ride: one stage of the game. The first is open from the start.
+/// Each one after it unlocks by completing [unlockLevel] levels in a run on
+/// the one before, or straight away for coins or diamonds.
+class Track {
+  const Track({
+    required this.id,
+    required this.stage,
+    required this.name,
+    required this.description,
+    required this.theme,
+    this.unlockLevel = 0,
+    this.coinPrice = 0,
+    this.diamondPrice = 0,
+  });
+
+  final String id;
+
+  /// 1 for the first track, 2 for the next, ...
+  final int stage;
+  final String name;
+  final String description;
+  final TrackTheme theme;
+  final int unlockLevel;
+  final int coinPrice;
+  final int diamondPrice;
+
+  bool get isFree => unlockLevel == 0;
+  bool get hasObstacles => theme == TrackTheme.mountain;
+}
+
 class CoinPack {
   const CoinPack(this.productId, this.coins, {this.badge});
 
@@ -122,6 +156,26 @@ class Catalog {
     ),
   ];
 
+  static const List<Track> tracks = [
+    Track(
+      id: 'highway',
+      stage: 1,
+      name: 'Green Highway',
+      description: 'Dodge the traffic on the open road',
+      theme: TrackTheme.highway,
+    ),
+    Track(
+      id: 'mountain',
+      stage: 2,
+      name: 'Mountain Pass',
+      description: 'Rocks, barriers, potholes, oil slicks and jump ramps',
+      theme: TrackTheme.mountain,
+      unlockLevel: 20,
+      coinPrice: 100000,
+      diamondPrice: 100,
+    ),
+  ];
+
   static const List<CoinPack> coinPacks = [
     CoinPack('coins_small', 10000),
     CoinPack('coins_medium', 30000, badge: 'POPULAR'),
@@ -146,6 +200,15 @@ class Catalog {
 
   static BikeSkin bike(String id) =>
       bikes.firstWhere((b) => b.id == id, orElse: () => bikes.first);
+
+  static Track track(String id) =>
+      tracks.firstWhere((t) => t.id == id, orElse: () => tracks.first);
+
+  /// The track that riding [track] unlocks, or null for the last one.
+  static Track? nextTrack(Track track) {
+    final i = tracks.indexOf(track);
+    return i >= 0 && i + 1 < tracks.length ? tracks[i + 1] : null;
+  }
 
   static BikeSkin? bikeForProduct(String productId) {
     for (final b in bikes) {

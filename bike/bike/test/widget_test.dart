@@ -55,6 +55,39 @@ void main() {
       expect(g.targetLane, BikeGame.laneCount - 1);
     });
 
+    test('a lane change is done within a fifth of a second', () {
+      final g = newGame()..startGame();
+      g.steer(1);
+      for (var i = 0; i < 12; i++) {
+        g.update(1 / 60);
+      }
+      expect(g.playerLane, 2.0);
+    });
+
+    test('every 10 levels completed in a run is worth a diamond', () {
+      final g = newGame()..startGame();
+      var gifts = 0;
+      g.onDiamondEarned = () => gifts++;
+      // Rides to just short of each level's end, then one more frame.
+      void rideTo(int level) {
+        g.distance = BikeGame.levelDistance * (level - 1) - 0.01;
+        g.update(1 / 60);
+        expect(g.level, level);
+      }
+
+      rideTo(10);
+      expect(gifts, 0, reason: 'level 10 reached but not completed yet');
+      rideTo(11);
+      expect(gifts, 1);
+      rideTo(15);
+      expect(gifts, 1);
+      rideTo(21);
+      expect(gifts, 2);
+      expect(g.diamondsEarned, 2);
+      g.startGame();
+      expect(g.diamondsEarned, 0, reason: 'counted per run');
+    });
+
     test('riding advances distance and score', () {
       final g = newGame()..startGame();
       for (var i = 0; i < 60; i++) {
@@ -142,6 +175,126 @@ void main() {
     });
   });
 
+  group('Stage 2', () {
+    final mountain = Catalog.track('mountain');
+
+    BikeGame mountainGame() => newGame()
+      ..setTrack(mountain)
+      ..startGame();
+
+    test('each stage has its own scenery', () {
+      final g = newGame();
+      expect(g.scenery.map((s) => s.kind),
+          everyElement(isIn(const [SceneryKind.tree, SceneryKind.bush,
+              SceneryKind.flowers])));
+      g.setTrack(mountain);
+      expect(g.scenery, isNotEmpty);
+      expect(g.scenery.map((s) => s.kind),
+          everyElement(isIn(const [SceneryKind.pine, SceneryKind.boulder,
+              SceneryKind.pebbles])));
+    });
+
+    test('obstacles are only on the mountain, and every row leaves a lane',
+        () {
+      final highway = newGame()..startGame();
+      final g = mountainGame();
+      // Late levels, where rows are the fullest.
+      highway.distance = g.distance = BikeGame.levelDistance * 9;
+      var rows = 0;
+      final seen = <Obstacle>{};
+      for (var i = 0; i < 60 * 60; i++) {
+        g.invincibleTimer = highway.invincibleTimer = 10;
+        g.update(1 / 60);
+        highway.update(1 / 60);
+        expect(highway.obstacles, isEmpty);
+        // A row is laid all at once: what is new this frame.
+        final row = [for (final o in g.obstacles) if (seen.add(o)) o];
+        if (row.isEmpty) continue;
+        rows++;
+        final blocked = {
+          for (final o in row)
+            if (o.kind != ObstacleKind.ramp) ...{o.lane, o.lastLane},
+        };
+        expect(blocked.length, lessThan(BikeGame.laneCount));
+      }
+      expect(rows, greaterThan(20));
+    });
+
+    test('a rock costs a life, but boosting smashes it', () {
+      final g = mountainGame();
+      g.obstacles.add(Obstacle(ObstacleKind.rock, g.targetLane, g.playerY));
+      g.update(1 / 60);
+      expect(g.lives, BikeGame.startLives - 1);
+
+      final b = mountainGame()
+        ..nitro = 1
+        ..activateBoost();
+      b.obstacles.add(Obstacle(ObstacleKind.barrier, 0, b.playerY));
+      b.update(1 / 60);
+      expect(b.lives, BikeGame.startLives);
+      expect(b.obstacles, isEmpty);
+    });
+
+    test('oil skids the bike a lane over and it cannot steer for a moment',
+        () {
+      final g = mountainGame();
+      g.obstacles.add(Obstacle(ObstacleKind.oil, 1, g.playerY));
+      g.update(1 / 60);
+      expect(g.targetLane, isNot(1));
+      expect(g.skidTimer, greaterThan(0));
+      final lane = g.targetLane;
+      g.steer(lane == 0 ? 1 : -1);
+      expect(g.targetLane, lane);
+      for (var i = 0; i < 40; i++) {
+        g.update(1 / 60);
+      }
+      g.steer(lane == 0 ? 1 : -1);
+      expect(g.targetLane, isNot(lane), reason: 'the tyres grip again');
+    });
+
+    test('a pothole slows the bike down', () {
+      final g = mountainGame();
+      for (var i = 0; i < 60; i++) {
+        g.update(1 / 60);
+      }
+      final before = g.speed;
+      g.obstacles.add(Obstacle(ObstacleKind.pothole, 1, g.playerY));
+      g.update(1 / 60);
+      expect(g.speed, lessThan(before * 0.7));
+      expect(g.lives, BikeGame.startLives);
+    });
+
+    test('a ramp flies the bike over a rock', () {
+      final g = mountainGame();
+      g.obstacles.add(Obstacle(ObstacleKind.ramp, 1, g.playerY));
+      g.update(1 / 60);
+      expect(g.air, greaterThan(0));
+      g.obstacles.add(Obstacle(ObstacleKind.rock, 1, g.playerY));
+      for (var i = 0; i < 60; i++) {
+        g.update(1 / 60);
+      }
+      expect(g.airTimer, 0, reason: 'landed');
+      expect(g.lives, BikeGame.startLives);
+    });
+
+    test('completing level 20 on stage 1 earns stage 2', () {
+      final g = newGame()..startGame();
+      final earned = <Track>[];
+      g.onTrackEarned = (track) {
+        earned.add(track);
+        return true;
+      };
+      g.distance = BikeGame.levelDistance * 19 - 0.01;
+      g.update(1 / 60);
+      expect(g.level, 20);
+      expect(earned, isEmpty, reason: 'level 20 reached but not completed');
+      g.distance = BikeGame.levelDistance * 20 - 0.01;
+      g.update(1 / 60);
+      expect(g.level, 21);
+      expect(earned, [mountain]);
+    });
+  });
+
   group('PlayerProgress', () {
     test('banks run coins and tracks the best score', () {
       final p = PlayerProgress.memory();
@@ -181,6 +334,33 @@ void main() {
       expect(p.diamonds, 1);
       expect(p.claimDaily(DateTime(2026, 10, 13, 0, 5)), isTrue);
       expect(p.diamonds, 2);
+    });
+
+    test('stage 2 opens by playing, or for coins or diamonds', () {
+      final mountain = Catalog.track('mountain');
+      final p = PlayerProgress.memory();
+      expect(p.hasTrack(Catalog.tracks.first), isTrue);
+      expect(p.hasTrack(mountain), isFalse);
+      p.selectTrack(mountain);
+      expect(p.selectedTrack, Catalog.tracks.first, reason: 'still locked');
+      expect(p.buyTrack(mountain), isFalse);
+      p.addCoins(mountain.coinPrice);
+      expect(p.buyTrack(mountain), isTrue);
+      expect(p.wallet, 0);
+      expect(p.selectedTrack, mountain);
+      expect(p.unlockTrack(mountain), isFalse, reason: 'already open');
+
+      final q = PlayerProgress.memory()..addDiamonds(mountain.diamondPrice - 1);
+      expect(q.buyTrack(mountain, withDiamonds: true), isFalse);
+      q.addDiamonds(1);
+      expect(q.buyTrack(mountain, withDiamonds: true), isTrue);
+      expect(q.diamonds, 0);
+
+      final r = PlayerProgress.memory();
+      expect(r.unlockTrack(mountain), isTrue);
+      expect(r.hasTrack(mountain), isTrue);
+      expect(r.selectedTrack, Catalog.tracks.first,
+          reason: 'earning it does not switch tracks by itself');
     });
 
     test('diamonds can only be spent by a player who has them', () {
@@ -270,6 +450,67 @@ void main() {
 
     await tester.dragFrom(right, const Offset(5, -120));
     expect(game.targetLane, 1, reason: 'swiping up is not a lane change');
+
+    // A finger held still steers without waiting for it to lift.
+    final hold = await tester.startGesture(right);
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(game.targetLane, 1, reason: 'too soon to tell tap from swipe');
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(game.targetLane, 2);
+
+    // Turning it into a slow swipe the other way takes the tap back.
+    await hold.moveBy(const Offset(-60, 0));
+    expect(game.targetLane, 0);
+    await hold.up();
+    expect(game.targetLane, 0, reason: 'lifting after a swipe is no tap');
+  });
+
+  testWidgets('completing level 10 adds a diamond to the player right away',
+      (tester) async {
+    final progress = PlayerProgress.memory();
+    await tester.pumpWidget(BikeRushApp(
+      progress: progress,
+      store: StoreService(progress, enabled: false),
+    ));
+    await tester.tap(find.text('PLAY'));
+    await tester.pump(const Duration(milliseconds: 100));
+    final road = tester.widget<CustomPaint>(find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is GamePainter));
+    final game = (road.painter! as GamePainter).game;
+
+    game.distance = BikeGame.levelDistance * 10 - 0.01;
+    await tester.pump(const Duration(milliseconds: 20));
+    expect(game.level, 11);
+    expect(progress.diamonds, 1, reason: 'given mid-run, not at the end');
+  });
+
+  testWidgets('stage 2 is bought on the menu and ridden next', (tester) async {
+    final mountain = Catalog.track('mountain');
+    final progress = PlayerProgress.memory()..addCoins(mountain.coinPrice);
+    await tester.pumpWidget(BikeRushApp(
+      progress: progress,
+      store: StoreService(progress, enabled: false),
+    ));
+    expect(find.text('TAP TO UNLOCK'), findsOneWidget);
+    await tester.tap(find.text('Mountain Pass'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Stage 2: Mountain Pass'), findsOneWidget);
+    await tester.tap(find.text('100,000 COINS'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(progress.wallet, 0);
+    expect(progress.selectedTrack, mountain);
+    expect(find.text('TAP TO UNLOCK'), findsNothing);
+    // Let the "unlocked" message finish showing.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.tap(find.text('PLAY'));
+    await tester.pump(const Duration(milliseconds: 100));
+    final road = tester.widget<CustomPaint>(find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is GamePainter));
+    expect((road.painter! as GamePainter).game.track, mountain);
   });
 
   testWidgets('GARAGE opens the shop', (tester) async {

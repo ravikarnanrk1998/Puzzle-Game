@@ -159,7 +159,8 @@ Both then ride their own road, see each other's score, and the higher score wins
 Creating a code costs **1 diamond**; joining a friend's code is free. If the player cancels
 before a friend joins, the diamond is given back. Players get diamonds two ways:
 
-- **Free**: 1 diamond a day, with the **CLAIM DAILY +1** button on the menu.
+- **Free**: 1 diamond a day, with the **CLAIM DAILY +1** button on the menu, and 1 diamond
+  every time a run completes 10 levels (level 10, 20, 30…).
 - **Paid**: packs of 1, 10, 20, 50 and 100 in **GARAGE → DIAMONDS** (the `diamonds_…`
   products in section 3).
 
@@ -168,8 +169,14 @@ own rules. Whenever `firestore.rules` changes, paste the whole file into **Fires
 Rules** again and press **Publish**. Until the match rules are published, the game says
 "1 VS 1 is not switched on yet."
 
-A riding player sends their score every 3 seconds, so a two-minute match is about 80 writes.
+A player sends their score every 3 seconds, so a two-minute match is about 80 writes.
 The free Firebase plan allows 20,000 writes a day.
+
+If a player's internet stops working during their run, they see **WEAK NETWORK** after about
+3 seconds. If it doesn't come back within about 8 seconds, their run ends and they lose the
+match. Their opponent is given the win. The first result saved in Firestore (the `winner`
+field of the match) is final, so a phone that comes back online later can't change it with
+the scores it rode offline.
 
 ## Regenerating the icon and store images
 

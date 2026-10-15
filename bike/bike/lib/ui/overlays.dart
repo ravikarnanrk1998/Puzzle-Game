@@ -8,6 +8,7 @@ import '../shop/catalog.dart';
 import '../shop/player_progress.dart';
 import '../versus/match_backend.dart';
 import '../versus/versus_match.dart';
+import 'track_picker.dart';
 
 const _gold = Color(0xFFFFC107);
 const _diamond = Color(0xFF40C4FF);
@@ -175,6 +176,13 @@ class Hud extends StatelessWidget {
                   child: Center(child: _RivalChip(rival: rival)),
                 ),
               ),
+            if (versus?.weakConnection ?? false)
+              const Positioned(
+                top: 146,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(child: Center(child: _WeakNetworkChip())),
+              ),
             Positioned(
               left: 0,
               bottom: 0,
@@ -334,20 +342,12 @@ class _BoostButton extends StatelessWidget {
       child: Container(
         width: 86,
         height: 86,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          color: const Color(0xCC101521),
-          boxShadow: [
-            if (glow > 0)
-              BoxShadow(
-                color: color.withValues(alpha: 0.6 * glow),
-                blurRadius: 22,
-                spreadRadius: 2,
-              ),
-          ],
+          color: Color(0xCC101521),
         ),
         child: CustomPaint(
-          painter: _RingPainter(game.nitro, color),
+          painter: _RingPainter(game.nitro, color, glow),
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -372,13 +372,34 @@ class _BoostButton extends StatelessWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  _RingPainter(this.value, this.color);
+  _RingPainter(this.value, this.color, this.glow);
 
   final double value;
   final Color color;
 
+  /// 0 to 1: how strongly the button glows.
+  final double glow;
+
   @override
   void paint(Canvas canvas, Size size) {
+    if (glow > 0) {
+      // A gradient halo rather than a blurred shadow: it changes every
+      // frame, and re-blurring it every frame is costly on phones.
+      // Only outside the button's edge, like the shadow it replaces.
+      final center = size.center(Offset.zero);
+      final radius = size.width / 2 + 16;
+      final edge = (size.width / 2 - 2) / radius;
+      final clear = color.withValues(alpha: 0);
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [clear, clear, color.withValues(alpha: 0.6 * glow), clear],
+            stops: [0, edge, edge, 1],
+          ).createShader(Rect.fromCircle(center: center, radius: radius)),
+      );
+    }
     final rect = (Offset.zero & size).deflate(6);
     final stroke = Paint()
       ..style = PaintingStyle.stroke
@@ -399,7 +420,7 @@ class _RingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RingPainter old) =>
-      old.value != value || old.color != color;
+      old.value != value || old.color != color || old.glow != glow;
 }
 
 // ---------------------------------------------------------------- menus
@@ -607,6 +628,7 @@ class MenuOverlay extends StatelessWidget {
     required this.progress,
     required this.onPlay,
     required this.onShop,
+    required this.onTrack,
     this.accountName,
     this.onAccount,
     this.onVersus,
@@ -617,6 +639,9 @@ class MenuOverlay extends StatelessWidget {
   final PlayerProgress progress;
   final VoidCallback onPlay;
   final VoidCallback onShop;
+
+  /// A stage was tapped: ride it next, or see how to unlock it.
+  final ValueChanged<Track> onTrack;
 
   /// Opens a 1 vs 1 match. The button is hidden when this is null, as
   /// matches need a signed-in player. So are the diamonds that pay for
@@ -666,16 +691,25 @@ class MenuOverlay extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 18),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: TrackPicker(progress: progress, onTap: onTrack),
+                    ),
+                    const SizedBox(height: 14),
                     Text('RIDING: ${bike.name.toUpperCase()}',
                         style: _labelStyle.copyWith(color: bike.color)),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Transform.scale(
                       scale: pulse,
-                      child: BigButton(
-                        label: 'PLAY',
-                        icon: Icons.play_arrow_rounded,
-                        onTap: onPlay,
+                      // Drawn once and then only scaled, instead of
+                      // redrawing the button and its shadow every frame.
+                      child: RepaintBoundary(
+                        child: BigButton(
+                          label: 'PLAY',
+                          icon: Icons.play_arrow_rounded,
+                          onTap: onPlay,
+                        ),
                       ),
                     ),
                     if (onVersus != null) ...[
@@ -713,7 +747,7 @@ class MenuOverlay extends StatelessWidget {
                       ),
                     ],
                     const SizedBox(height: 26),
-                    const _HowToPlay(),
+                    _HowToPlay(diamonds: onVersus != null),
                   ],
                 ),
               ),
@@ -836,7 +870,10 @@ class GameTitle extends StatelessWidget {
 }
 
 class _HowToPlay extends StatelessWidget {
-  const _HowToPlay();
+  const _HowToPlay({required this.diamonds});
+
+  /// Whether diamonds are part of the game here (they need an account).
+  final bool diamonds;
 
   @override
   Widget build(BuildContext context) {
@@ -851,6 +888,18 @@ class _HowToPlay extends StatelessWidget {
       (Icons.monetization_on, 'Coins and close calls charge your NITRO'),
       (Icons.bolt, 'Boost smashes through traffic for points'),
       (Icons.storefront_rounded, 'Spend coins on faster-starting bikes'),
+      for (final track in Catalog.tracks.skip(1))
+        (
+          Icons.terrain_rounded,
+          'Complete level ${track.unlockLevel} on Stage ${track.stage - 1} '
+              'to unlock Stage ${track.stage}: ${track.name}',
+        ),
+      if (diamonds)
+        (
+          Icons.diamond,
+          'Every ${BikeGame.levelsPerDiamond} levels you complete in a run '
+              'gives a free diamond',
+        ),
     ];
     return _Panel(
       child: Column(
@@ -1040,6 +1089,11 @@ class GameOverOverlay extends StatelessWidget {
                         _Stat(Icons.flag, '${game.level}', 'LEVEL'),
                       ],
                     ),
+                    if (game.diamondsEarned > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: _LevelDiamonds(count: game.diamondsEarned),
+                      ),
                     const SizedBox(height: 12),
                     Wrap(
                       alignment: WrapAlignment.center,
@@ -1121,6 +1175,31 @@ class GameOverOverlay extends StatelessWidget {
   }
 }
 
+/// "+2 diamonds for completing levels", on the screens after a run.
+class _LevelDiamonds extends StatelessWidget {
+  const _LevelDiamonds({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.diamond, color: _diamond, size: 20),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            '+$count ${count == 1 ? 'diamond' : 'diamonds'} for completing '
+            'levels',
+            style: _smallStyle.copyWith(color: _diamond),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Stat extends StatelessWidget {
   const _Stat(this.icon, this.value, this.label);
 
@@ -1181,6 +1260,43 @@ class _RivalChip extends StatelessWidget {
             Text('OUT',
                 style: _smallStyle.copyWith(color: const Color(0xFFFF8A80))),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown while riding in a 1 vs 1 match when this phone's connection is
+/// not keeping up. If it doesn't recover, the match is lost.
+class _WeakNetworkChip extends StatelessWidget {
+  const _WeakNetworkChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return _Chip(
+      color: const Color(0xE6D84315),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 22),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('WEAK NETWORK', style: _smallStyle),
+                Text(
+                  'Reconnect fast or you lose the match',
+                  style: _smallStyle.copyWith(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1248,18 +1364,24 @@ class VersusResultOverlay extends StatelessWidget {
     super.key,
     required this.match,
     required this.coinsEarned,
+    this.diamondsEarned = 0,
     required this.onLeave,
   });
 
   final VersusMatch match;
   final int coinsEarned;
+
+  /// Diamonds the run earned by completing levels.
+  final int diamondsEarned;
   final VoidCallback onLeave;
 
   @override
   Widget build(BuildContext context) {
     final rival = match.opponent;
     final rivalName = rival?.name ?? 'Opponent';
-    final (title, color, icon) = switch (match.outcome) {
+    final outcome = match.outcome;
+    final lostMine = match.connectionLost && outcome != VersusOutcome.win;
+    final (title, color, icon) = switch (outcome) {
       VersusOutcome.win => (
           'YOU WIN!',
           const Color(0xFF69F0AE),
@@ -1268,16 +1390,39 @@ class VersusResultOverlay extends StatelessWidget {
       VersusOutcome.lose => (
           'YOU LOSE',
           const Color(0xFFFF5252),
-          Icons.sentiment_dissatisfied_rounded,
+          lostMine
+              ? Icons.wifi_off_rounded
+              : Icons.sentiment_dissatisfied_rounded,
         ),
       VersusOutcome.draw => ('DRAW', _gold, Icons.handshake_rounded),
       null => ('WAITING…', Colors.white, Icons.hourglass_top_rounded),
     };
-    final note = match.opponentLeft
-        ? '$rivalName left the match.'
-        : match.outcome == null
-            ? '$rivalName is still riding. They win if they pass your score.'
-            : null;
+    // A note about this phone's own connection is a warning.
+    final (note, warning) = switch (outcome) {
+      _ when lostMine => (
+          'Your network is not strong enough. The connection was lost, '
+              'so you lose this match.',
+          true,
+        ),
+      VersusOutcome.win when match.opponentDropped => (
+          '$rivalName lost their connection.',
+          false,
+        ),
+      VersusOutcome.win when match.opponentLeft => (
+          '$rivalName left the match.',
+          false,
+        ),
+      null when match.weakConnection => (
+          'Weak network. Reconnecting to get the result…',
+          true,
+        ),
+      null when match.decided => ('Getting the result…', false),
+      null => (
+          '$rivalName is still riding. They win if they pass your score.',
+          false,
+        ),
+      _ => (null, false),
+    };
     return ColoredBox(
       color: const Color(0xAA000000),
       child: SafeArea(
@@ -1299,7 +1444,12 @@ class VersusResultOverlay extends StatelessWidget {
                         fontStyle: FontStyle.italic,
                       ),
                     ),
-                    if (note != null)
+                    if (note != null && warning)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: _NetworkWarning(note),
+                      )
+                    else if (note != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 6),
                         child: Text(
@@ -1317,18 +1467,22 @@ class VersusResultOverlay extends StatelessWidget {
                           child: _VersusScore(
                             name: 'YOU',
                             score: match.myScore,
-                            status: 'finished',
+                            status: match.connectionLost
+                                ? 'connection lost'
+                                : 'finished',
                           ),
                         ),
                         Expanded(
                           child: _VersusScore(
                             name: rivalName,
                             score: rival?.score ?? 0,
-                            status: match.opponentLeft
-                                ? 'left'
-                                : (rival?.done ?? false)
-                                    ? 'finished'
-                                    : 'riding…',
+                            status: match.opponentDropped
+                                ? 'connection lost'
+                                : match.opponentLeft
+                                    ? 'left'
+                                    : (rival?.done ?? false)
+                                        ? 'finished'
+                                        : 'riding…',
                           ),
                         ),
                       ],
@@ -1343,6 +1497,11 @@ class VersusResultOverlay extends StatelessWidget {
                         Text('+$coinsEarned coins', style: _smallStyle),
                       ],
                     ),
+                    if (diamondsEarned > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: _LevelDiamonds(count: diamondsEarned),
+                      ),
                     const SizedBox(height: 20),
                     BigButton(
                       label: 'MENU',
@@ -1355,6 +1514,43 @@ class VersusResultOverlay extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A note about this phone's own connection, on the 1 vs 1 result.
+class _NetworkWarning extends StatelessWidget {
+  const _NetworkWarning(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0x33FF5252),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x88FF5252)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_off_rounded,
+              color: Color(0xFFFF8A80), size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

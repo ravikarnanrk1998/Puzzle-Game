@@ -7,6 +7,7 @@ import '../account/account_service.dart';
 import '../audio/game_music.dart';
 import '../game/bike_game.dart';
 import '../game/game_painter.dart';
+import '../shop/catalog.dart';
 import '../shop/player_progress.dart';
 import '../shop/store_service.dart';
 import '../versus/match_backend.dart';
@@ -14,6 +15,7 @@ import '../versus/versus_match.dart';
 import 'account_dialog.dart';
 import 'overlays.dart';
 import 'shop_screen.dart';
+import 'track_picker.dart';
 import 'versus_screen.dart';
 
 class GameScreen extends StatefulWidget {
@@ -50,9 +52,20 @@ class _GameScreenState extends State<GameScreen>
   Duration _last = Duration.zero;
   bool _foreground = true;
 
-  /// Where each finger on the road went down. A finger is dropped from here
-  /// once it has steered, or has moved too far to still be a tap.
-  final Map<int, Offset> _touches = {};
+  /// A finger held down this long without swiping is a tap. Waiting for it
+  /// to lift instead would make every tap feel late.
+  static const _tapAfter = Duration(milliseconds: 50);
+
+  /// How far a finger moves sideways before it counts as a swipe.
+  static const _swipeDistance = 12.0;
+
+  /// Fingers on the road, by pointer.
+  final Map<int, _Touch> _touches = {};
+
+  /// The game clock, from the ticker, and the screen width: what taps are
+  /// timed and sided by.
+  Duration _now = Duration.zero;
+  double _width = 0;
 
   /// The 1 vs 1 match being played, if any, and the seconds left before
   /// its run starts.
@@ -64,9 +77,13 @@ class _GameScreenState extends State<GameScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _game.bike = widget.progress.selectedBike;
-    widget.progress.addListener(_syncBike);
+    _game.setTrack(_track);
+    widget.progress.addListener(_syncProgress);
     _game.addListener(_syncMusic);
     _game.onGameOver = _bankRun;
+    // Given straight away, so quitting mid-run doesn't lose it.
+    _game.onDiamondEarned = () => widget.progress.addDiamonds(1);
+    _game.onTrackEarned = widget.progress.unlockTrack;
     _game.onImpact = (heavy) =>
         heavy ? HapticFeedback.heavyImpact() : HapticFeedback.mediumImpact();
     _ticker = createTicker(_onTick)..start();
@@ -74,7 +91,7 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void dispose() {
-    widget.progress.removeListener(_syncBike);
+    widget.progress.removeListener(_syncProgress);
     WidgetsBinding.instance.removeObserver(this);
     _ticker.dispose();
     _versus
@@ -103,6 +120,11 @@ class _GameScreenState extends State<GameScreen>
   void _onTick(Duration elapsed) {
     var dt = (elapsed - _last).inMicroseconds / Duration.microsecondsPerSecond;
     _last = elapsed;
+    _now = elapsed;
+    for (final touch in _touches.values) {
+      final waiting = !touch.done && touch.tapped == 0;
+      if (waiting && _now - touch.downAt >= _tapAfter) _tap(touch);
+    }
     // Clamp long frames (e.g. after a hitch) so nothing teleports.
     if (dt > 1 / 30) dt = 1 / 30;
     final versus = _versus;
@@ -113,50 +135,99 @@ class _GameScreenState extends State<GameScreen>
           versus.start();
           _start();
         }
-      } else if (_game.isRunning) {
+      } else if (_game.isRunning || _game.phase == GamePhase.paused) {
         versus.report(_game.scoreValue);
-        // The other player is out and already beaten: nothing left to ride for.
-        if (versus.outcome == VersusOutcome.win) _game.finishRun();
+        // Beaten an opponent who is out, or lost the connection: nothing
+        // left to ride for.
+        if (versus.decided) _game.finishRun();
       }
     }
     _game.update(dt);
   }
 
   void _start() {
+    _game.setTrack(_track);
     _game.startGame();
     _focus.requestFocus();
   }
 
   void _menu() {
     _game.goToMenu();
+    _game.setTrack(_track);
     _focus.requestFocus();
   }
 
+  /// The track runs are on: the one picked on the menu, except that a
+  /// 1 vs 1 match is always on the first, so both riders face the same road.
+  Track get _track =>
+      _versus == null ? widget.progress.selectedTrack : Catalog.tracks.first;
+
+  /// A stage tapped on the menu: ride it next, or offer to unlock it.
+  Future<void> _pickTrack(Track track) async {
+    final progress = widget.progress;
+    if (progress.hasTrack(track)) {
+      progress.selectTrack(track);
+      return;
+    }
+    final bought = await showUnlockTrackDialog(context, track, progress);
+    if (!mounted) return;
+    _focus.requestFocus();
+    if (!bought) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('Stage ${track.stage}: ${track.name} unlocked! '
+            'Tap PLAY to ride it.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+  }
+
   void _touchDown(PointerDownEvent e) {
-    if (_game.isRunning) _touches[e.pointer] = e.localPosition;
+    if (_game.isRunning) _touches[e.pointer] = _Touch(e.localPosition, _now);
   }
 
   /// A sideways swipe moves one lane that way, wherever on the screen it
-  /// starts.
+  /// starts. Most swipes get there before [_tapAfter], so they never count
+  /// as a tap at all.
   void _touchMove(PointerMoveEvent e) {
-    final start = _touches[e.pointer];
-    if (start == null) return;
-    final moved = e.localPosition - start;
-    if (moved.distance <= kTouchSlop) return;
-    _touches.remove(e.pointer);
-    // Swipes up and down do nothing, and are not taps either.
-    if (moved.dx.abs() > moved.dy.abs()) _game.steer(moved.dx < 0 ? -1 : 1);
+    final touch = _touches[e.pointer];
+    if (touch == null || touch.done) return;
+    final moved = e.localPosition - touch.start;
+    if (moved.dx.abs() >= _swipeDistance && moved.dx.abs() > moved.dy.abs()) {
+      touch.done = true;
+      final dir = moved.dx < 0 ? -1 : 1;
+      if (touch.tapped == dir) return;
+      // A slow swipe that already counted as a tap the other way: take the
+      // tap back, then go the way of the swipe.
+      if (touch.tapMoved) _game.steer(-touch.tapped);
+      _game.steer(dir);
+    } else if (touch.tapped == 0 && moved.distance > kTouchSlop) {
+      // Dragging up or down is not a control, and not a tap either.
+      touch.done = true;
+    }
   }
 
-  /// A finger lifted without swiping was a tap: one lane towards the side
-  /// of the screen it touched. Steering on the lift rather than on the touch
-  /// is what keeps a swipe from counting as a tap first.
-  void _touchUp(PointerUpEvent e, double width) {
-    final start = _touches.remove(e.pointer);
-    if (start != null) _game.steer(start.dx < width / 2 ? -1 : 1);
+  /// A quick tap lifts before [_tapAfter], and steers now.
+  void _touchUp(PointerUpEvent e) {
+    final touch = _touches.remove(e.pointer);
+    if (touch != null && !touch.done && touch.tapped == 0) _tap(touch);
   }
 
-  void _syncBike() => _game.bike = widget.progress.selectedBike;
+  /// One lane towards the side of the screen the finger touched.
+  void _tap(_Touch touch) {
+    final dir = touch.start.dx < _width / 2 ? -1 : 1;
+    final lane = _game.targetLane;
+    _game.steer(dir);
+    touch
+      ..tapped = dir
+      ..tapMoved = _game.targetLane != lane;
+  }
+
+  void _syncProgress() {
+    _game.bike = widget.progress.selectedBike;
+    // The menu shows the road of the track picked for the next run.
+    if (_game.phase == GamePhase.menu) _game.setTrack(_track);
+  }
 
   /// Moves the coins from this run into the wallet.
   void _bankRun() {
@@ -233,6 +304,7 @@ class _GameScreenState extends State<GameScreen>
       _versus = match;
       _countdown = 3;
     });
+    _game.setTrack(_track);
   }
 
   void _leaveVersus() {
@@ -290,6 +362,7 @@ class _GameScreenState extends State<GameScreen>
         child: LayoutBuilder(
           builder: (context, constraints) {
             _game.resize(constraints.biggest);
+            _width = constraints.maxWidth;
             return Stack(
               fit: StackFit.expand,
               children: [
@@ -297,7 +370,7 @@ class _GameScreenState extends State<GameScreen>
                   behavior: HitTestBehavior.opaque,
                   onPointerDown: _touchDown,
                   onPointerMove: _touchMove,
-                  onPointerUp: (e) => _touchUp(e, constraints.maxWidth),
+                  onPointerUp: _touchUp,
                   onPointerCancel: (e) => _touches.remove(e.pointer),
                   child: RepaintBoundary(
                     child: CustomPaint(
@@ -338,6 +411,7 @@ class _GameScreenState extends State<GameScreen>
           progress: widget.progress,
           onPlay: _start,
           onShop: _openShop,
+          onTrack: _pickTrack,
           onVersus: canVersus ? _openVersus : null,
           onClaimDaily:
               canVersus && widget.progress.canClaimDaily() ? _claimDaily : null,
@@ -364,6 +438,7 @@ class _GameScreenState extends State<GameScreen>
           return VersusResultOverlay(
             match: versus,
             coinsEarned: widget.progress.lastRun?.coinsEarned ?? 0,
+            diamondsEarned: _game.diamondsEarned,
             onLeave: _leaveVersus,
           );
         }
@@ -377,4 +452,22 @@ class _GameScreenState extends State<GameScreen>
         );
     }
   }
+}
+
+/// A finger on the road, from touching down until it lifts.
+class _Touch {
+  _Touch(this.start, this.downAt);
+
+  final Offset start;
+  final Duration downAt;
+
+  /// The way this finger steered as a tap (-1 left, 1 right), or 0 if it
+  /// has not.
+  int tapped = 0;
+
+  /// Whether that tap moved the bike. It can't past the edge of the road.
+  bool tapMoved = false;
+
+  /// Set once the finger has swiped, or dragged too far to be a tap.
+  bool done = false;
 }

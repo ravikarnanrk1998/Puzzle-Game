@@ -307,24 +307,27 @@ class _VersusLobbyScreenState extends State<VersusLobbyScreen> {
           onTap: _create,
         ),
       const SizedBox(height: 10),
-      const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Costs ${Catalog.versusCost}',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
+      const FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Costs ${Catalog.versusCost}',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          SizedBox(width: 4),
-          Icon(Icons.diamond, color: _diamond, size: 16),
-          Text(
-            '  •  Joining is free',
-            style: TextStyle(color: Colors.white54, fontSize: 13),
-          ),
-        ],
+            SizedBox(width: 4),
+            Icon(Icons.diamond, color: _diamond, size: 16),
+            Text(
+              '  •  Joining is free',
+              style: TextStyle(color: Colors.white54, fontSize: 13),
+            ),
+          ],
+        ),
       ),
       if (!_canPay)
         TextButton.icon(

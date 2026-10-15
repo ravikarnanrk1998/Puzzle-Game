@@ -4,6 +4,25 @@ import 'package:flutter/material.dart';
 
 import '../shop/catalog.dart';
 
+// The bike's fixed shapes, built once instead of every frame.
+final Path _body = Path()
+  ..moveTo(0, -30)
+  ..quadraticBezierTo(11, -24, 11, -8)
+  ..lineTo(9, 18)
+  ..quadraticBezierTo(0, 26, -9, 18)
+  ..lineTo(-11, -8)
+  ..quadraticBezierTo(-11, -24, 0, -30)
+  ..close();
+
+final Path _windshield = Path()
+  ..moveTo(-7, -22)
+  ..quadraticBezierTo(0, -29, 7, -22)
+  ..lineTo(5, -17)
+  ..lineTo(-5, -17)
+  ..close();
+
+const Rect _glowArea = Rect.fromLTWH(-34, -34, 68, 68);
+
 /// Draws a top-down motorbike facing up, centred on the origin
 /// (about 30 x 62 units). Shared by the game, the shop and the app icon.
 void paintBike(Canvas canvas, BikeSkin skin,
@@ -13,13 +32,25 @@ void paintBike(Canvas canvas, BikeSkin skin,
   final light = skin.accent;
 
   if (skin.glow) {
+    // A soft oval halo. A gradient gives the same look as a blur filter at
+    // a fraction of the cost, which matters as it is drawn every frame.
     final pulse = 0.55 + 0.25 * sin(time * 5);
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset.zero, width: 46, height: 78),
+    canvas.save();
+    canvas.scale(1, 78 / 46);
+    canvas.drawCircle(
+      Offset.zero,
+      34,
       Paint()
-        ..color = skin.accent.withValues(alpha: pulse)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+        ..shader = RadialGradient(
+          colors: [
+            skin.accent.withValues(alpha: pulse),
+            skin.accent.withValues(alpha: pulse * 0.5),
+            skin.accent.withValues(alpha: 0),
+          ],
+          stops: const [0.35, 0.65, 1],
+        ).createShader(_glowArea),
     );
+    canvas.restore();
   }
 
   canvas.drawRRect(
@@ -64,15 +95,7 @@ void paintBike(Canvas canvas, BikeSkin skin,
     tyre,
   );
 
-  final body = Path()
-    ..moveTo(0, -30)
-    ..quadraticBezierTo(11, -24, 11, -8)
-    ..lineTo(9, 18)
-    ..quadraticBezierTo(0, 26, -9, 18)
-    ..lineTo(-11, -8)
-    ..quadraticBezierTo(-11, -24, 0, -30)
-    ..close();
-  canvas.drawPath(body, Paint()..color = color);
+  canvas.drawPath(_body, Paint()..color = color);
   canvas.drawRRect(
     RRect.fromRectAndRadius(
       Rect.fromCenter(center: const Offset(0, -10), width: 4, height: 30),
@@ -80,15 +103,7 @@ void paintBike(Canvas canvas, BikeSkin skin,
     ),
     Paint()..color = light,
   );
-  canvas.drawPath(
-    Path()
-      ..moveTo(-7, -22)
-      ..quadraticBezierTo(0, -29, 7, -22)
-      ..lineTo(5, -17)
-      ..lineTo(-5, -17)
-      ..close(),
-    Paint()..color = const Color(0xCC90CAF9),
-  );
+  canvas.drawPath(_windshield, Paint()..color = const Color(0xCC90CAF9));
 
   canvas.drawLine(
     const Offset(-15, -13),

@@ -174,6 +174,7 @@ class FirestoreSaves implements SaveBackend {
       selected: selected is String ? selected : null,
       delivered: strings(doc['delivered']),
       dailyClaim: dailyClaim is String ? dailyClaim : null,
+      tracks: strings(doc['tracks']).toSet(),
     );
   }
 
@@ -193,6 +194,8 @@ class FirestoreSaves implements SaveBackend {
       if (delta.selected != null) 'selected': delta.selected,
       if (delta.orders.isNotEmpty)
         'delivered': FieldValue.arrayUnion(delta.orders),
+      if (delta.tracks.isNotEmpty)
+        'tracks': FieldValue.arrayUnion(delta.tracks.toList()),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true)).onError<Object>(
         (e, _) => debugPrint('Cloud save write failed: $e'));

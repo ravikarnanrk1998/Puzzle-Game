@@ -10,7 +10,9 @@ enum VehicleKind { car, truck }
 
 enum PickupKind { coin, nitro, shield, heart }
 
-enum SceneryKind { tree, bush, flowers }
+enum SceneryKind { tree, bush, flowers, pine, boulder, pebbles }
+
+enum ObstacleKind { rock, barrier, pothole, oil, ramp }
 
 class Vehicle {
   Vehicle({
@@ -84,6 +86,46 @@ class Scenery {
   double y;
 }
 
+/// Something lying on the road of an obstacle track. It stays where it is
+/// on the road, so it comes down the screen at the bike's speed.
+class Obstacle {
+  Obstacle(this.kind, this.lane, this.y);
+
+  final ObstacleKind kind;
+
+  /// The lane it is in. A barrier also covers the lane to its right.
+  final int lane;
+  double y;
+
+  /// Set once the bike has run over it, so it only acts once.
+  bool hit = false;
+
+  int get lanes => kind == ObstacleKind.barrier ? 2 : 1;
+  int get lastLane => lane + lanes - 1;
+  double get x => BikeGame.laneCenter((lane + lastLane) / 2);
+
+  double get width => switch (kind) {
+        ObstacleKind.barrier => BikeGame.laneWidth * 2 - 14,
+        ObstacleKind.oil => 52,
+        ObstacleKind.ramp => 50,
+        ObstacleKind.rock => 46,
+        ObstacleKind.pothole => 40,
+      };
+
+  double get height => switch (kind) {
+        ObstacleKind.ramp => 60,
+        ObstacleKind.oil => 46,
+        ObstacleKind.rock => 42,
+        ObstacleKind.pothole => 30,
+        ObstacleKind.barrier => 22,
+      };
+
+  /// Rocks and barriers stop the bike. The rest change how it rides.
+  bool get blocks => kind == ObstacleKind.rock || kind == ObstacleKind.barrier;
+
+  bool covers(int l) => l >= lane && l <= lastLane;
+}
+
 /// All game state and rules. Everything is in "world units": the road area is
 /// [worldWidth] wide and the painter scales it to fit the screen.
 class BikeGame extends ChangeNotifier {
@@ -102,6 +144,9 @@ class BikeGame extends ChangeNotifier {
   static const double levelDistance = 700;
   static const double minBoost = 0.3;
   static const int reviveCost = 250;
+
+  /// Seconds a jump off a ramp lasts.
+  static const double jumpTime = 0.9;
 
   static const List<Color> carColors = [
     Color(0xFFEF5350),
@@ -125,6 +170,18 @@ class BikeGame extends ChangeNotifier {
   /// Called when a run ends (including after a used continue).
   VoidCallback? onGameOver;
 
+  /// Called each time a run completes another [levelsPerDiamond] levels,
+  /// which is worth a free diamond.
+  VoidCallback? onDiamondEarned;
+
+  /// Levels to complete for each free diamond.
+  static const int levelsPerDiamond = 10;
+
+  /// Called when a run completes the level that unlocks the next track
+  /// ([Track.unlockLevel]). Returns true if that track was locked until
+  /// now.
+  bool Function(Track track)? onTrackEarned;
+
   // Viewport, in world units.
   double scale = 1;
   double viewWidth = worldWidth;
@@ -133,6 +190,8 @@ class BikeGame extends ChangeNotifier {
 
   GamePhase phase = GamePhase.menu;
   BikeSkin bike = Catalog.bikes.first;
+  Track _track = Catalog.tracks.first;
+  bool _sized = false;
 
   double time = 0;
   double playTime = 0;
@@ -154,11 +213,20 @@ class BikeGame extends ChangeNotifier {
   double crashTimer = 0;
   double crashSpin = 0;
 
+  /// Seconds left in the air after riding over a ramp.
+  double airTimer = 0;
+
+  /// Seconds left of sliding on oil, when the bike can't be steered.
+  double skidTimer = 0;
+
   /// Whether the one continue per run has been used.
   bool revived = false;
 
   /// Coins already handed to the wallet this run (before a continue).
   int coinsBanked = 0;
+
+  /// Diamonds this run has earned by completing levels.
+  int diamondsEarned = 0;
 
   int targetLane = 1;
   double playerLane = 1.5;
@@ -169,12 +237,23 @@ class BikeGame extends ChangeNotifier {
   final List<Particle> particles = [];
   final List<FloatingText> texts = [];
   final List<Scenery> scenery = [];
+  final List<Obstacle> obstacles = [];
 
   double _nextTraffic = 0;
   double _nextCoins = 0;
   double _nextPowerUp = 0;
   double _nextScenery = 0;
+  double _nextObstacles = 0;
   double _exhaustTimer = 0;
+
+  /// The lane the last row of obstacles left open.
+  int _openLane = 1;
+
+  /// The road being ridden: the stage.
+  Track get track => _track;
+
+  /// How high the bike is off the road: 0 on it, 1 at the top of a jump.
+  double get air => airTimer > 0 ? sin(pi * airTimer / jumpTime) : 0;
 
   Color get bikeColor => bike.color;
   bool get canRevive => phase == GamePhase.gameOver && !revived;
@@ -192,11 +271,19 @@ class BikeGame extends ChangeNotifier {
     viewWidth = size.width / scale;
     viewHeight = size.height / scale;
     offsetX = (viewWidth - worldWidth) / 2;
-    if (scenery.isEmpty) {
-      for (var y = viewHeight; y > -60; y -= 70 + _rng.nextDouble() * 80) {
-        _spawnScenery(y);
-      }
-    }
+    _sized = true;
+    if (scenery.isEmpty) _fillScenery();
+  }
+
+  /// Puts the game on [value]: what the menu shows, and where the next run
+  /// rides. Not for use mid-run, as the road changes at once.
+  void setTrack(Track value) {
+    if (value == _track) return;
+    _track = value;
+    obstacles.clear();
+    scenery.clear();
+    if (_sized) _fillScenery();
+    notifyListeners();
   }
 
   void startGame() {
@@ -218,8 +305,11 @@ class BikeGame extends ChangeNotifier {
     levelBannerTimer = 0;
     crashTimer = 0;
     crashSpin = 0;
+    airTimer = 0;
+    skidTimer = 0;
     revived = false;
     coinsBanked = 0;
+    diamondsEarned = 0;
     targetLane = 1;
     playerLane = 1;
     tilt = 0;
@@ -227,16 +317,22 @@ class BikeGame extends ChangeNotifier {
     pickups.clear();
     particles.clear();
     texts.clear();
+    obstacles.clear();
     _nextTraffic = 600;
     _nextCoins = 250;
     _nextPowerUp = 2200;
+    _nextObstacles = 900;
+    _openLane = 1;
     _addText('GO!', worldWidth / 2, viewHeight * 0.4, const Color(0xFFFFEB3B),
         size: 56, life: 1.0);
+    _addText('STAGE ${track.stage}  ${track.name.toUpperCase()}',
+        worldWidth / 2, viewHeight * 0.4 + 52, Colors.white,
+        size: 22, life: 1.6);
     notifyListeners();
   }
 
   void steer(int dir) {
-    if (!isRunning) return;
+    if (!isRunning || skidTimer > 0) return;
     targetLane = max(0, min(laneCount - 1, targetLane + dir));
   }
 
@@ -259,8 +355,11 @@ class BikeGame extends ChangeNotifier {
     invincibleTimer = 3;
     crashSpin = 0;
     tilt = 0;
+    airTimer = 0;
+    skidTimer = 0;
     speed = _baseSpeed * 0.6;
     vehicles.clear();
+    obstacles.clear();
     _addText('KEEP GOING!', worldWidth / 2, viewHeight * 0.4,
         const Color(0xFF69F0AE), size: 40);
     notifyListeners();
@@ -293,9 +392,12 @@ class BikeGame extends ChangeNotifier {
     pickups.clear();
     particles.clear();
     texts.clear();
+    obstacles.clear();
     boosting = false;
     shieldTimer = 0;
     invincibleTimer = 0;
+    airTimer = 0;
+    skidTimer = 0;
     shake = 0;
     crashSpin = 0;
     notifyListeners();
@@ -341,6 +443,11 @@ class BikeGame extends ChangeNotifier {
     shieldTimer = max(0.0, shieldTimer - dt);
     invincibleTimer = max(0.0, invincibleTimer - dt);
     levelBannerTimer = max(0.0, levelBannerTimer - dt);
+    skidTimer = max(0.0, skidTimer - dt);
+    if (airTimer > 0) {
+      airTimer -= dt;
+      if (airTimer <= 0) _land();
+    }
     if (comboTimer > 0) {
       comboTimer -= dt;
       if (comboTimer <= 0) combo = 0;
@@ -354,19 +461,45 @@ class BikeGame extends ChangeNotifier {
       level = newLevel;
       levelBannerTimer = 2.2;
       score += 100;
+      // Level 10, 20, 30... completed: a free diamond.
+      if ((level - 1) % levelsPerDiamond == 0) {
+        diamondsEarned++;
+        _addText('+1 DIAMOND', worldWidth / 2, viewHeight * 0.3 + 86,
+            const Color(0xFF40C4FF),
+            size: 28, life: 2.2);
+        onDiamondEarned?.call();
+      }
+      final next = Catalog.nextTrack(track);
+      if (next != null &&
+          level - 1 >= next.unlockLevel &&
+          (onTrackEarned?.call(next) ?? false)) {
+        _addText('STAGE ${next.stage} UNLOCKED!', worldWidth / 2,
+            viewHeight * 0.3 + 124, const Color(0xFF69F0AE),
+            size: 26, life: 2.6);
+      }
     }
 
+    // Lane changes start fast and finish crisply, instead of easing in
+    // slowly over the last bit, so a dodge takes effect right away.
     final diff = targetLane - playerLane;
-    playerLane += diff * min(1.0, dt * 12);
-    if (diff.abs() < 0.002) playerLane = targetLane.toDouble();
-    tilt = (diff * 0.5).clamp(-0.4, 0.4);
+    final step = max(diff.abs() * min(1.0, dt * 16), dt * 4);
+    playerLane = diff.abs() <= step
+        ? targetLane.toDouble()
+        : playerLane + step * diff.sign;
+    // Sliding on oil, the bike wobbles from side to side.
+    tilt = skidTimer > 0
+        ? sin(skidTimer * 40) * 0.45
+        : (diff * 0.5).clamp(-0.4, 0.4);
 
     _scrollWorld(dt);
     _spawnTraffic(dt);
     _spawnPickups(dt);
+    _spawnObstacles(dt);
     _updateVehicles(dt);
     _updatePickups(dt);
+    _updateObstacles(dt);
     _checkCollisions();
+    _checkObstacles();
     _spawnExhaust(dt);
     _updateEffects(dt);
   }
@@ -378,6 +511,7 @@ class BikeGame extends ChangeNotifier {
     _scrollWorld(dt);
     _updateVehicles(dt);
     _updatePickups(dt);
+    _updateObstacles(dt);
     _spawnExhaust(dt);
     _updateEffects(dt);
     if (crashTimer <= 0) _endGame();
@@ -405,6 +539,12 @@ class BikeGame extends ChangeNotifier {
     }
   }
 
+  void _fillScenery() {
+    for (var y = viewHeight; y > -60; y -= 70 + _rng.nextDouble() * 80) {
+      _spawnScenery(y);
+    }
+  }
+
   void _spawnScenery(double y) {
     // Wide screens have more grass on the sides, so fill it with more stuff.
     final perSide = 1 + (offsetX / 140).floor();
@@ -421,11 +561,18 @@ class BikeGame extends ChangeNotifier {
         }
         final x = hi <= lo ? lo : lo + _rng.nextDouble() * (hi - lo);
         final roll = _rng.nextDouble();
-        final kind = roll < 0.5
-            ? SceneryKind.tree
-            : roll < 0.8
-                ? SceneryKind.bush
-                : SceneryKind.flowers;
+        final kind = switch (track.theme) {
+          TrackTheme.highway => roll < 0.5
+              ? SceneryKind.tree
+              : roll < 0.8
+                  ? SceneryKind.bush
+                  : SceneryKind.flowers,
+          TrackTheme.mountain => roll < 0.45
+              ? SceneryKind.pine
+              : roll < 0.8
+                  ? SceneryKind.boulder
+                  : SceneryKind.pebbles,
+        };
         scenery.add(Scenery(kind, x, y + _rng.nextDouble() * 40,
             0.75 + _rng.nextDouble() * 0.5));
       }
@@ -437,6 +584,8 @@ class BikeGame extends ChangeNotifier {
     if (_nextTraffic > 0) return;
     _nextTraffic =
         max(340.0, 620 - (level - 1) * 35.0) + _rng.nextDouble() * 180;
+    // On an obstacle road the road itself is the danger: less traffic.
+    if (track.hasObstacles) _nextTraffic *= 1.6;
 
     final busyTop = <int>{};
     final busyBand = <int>{};
@@ -445,12 +594,17 @@ class BikeGame extends ChangeNotifier {
       if (v.y - v.height / 2 < 90) busyTop.addAll(lanes);
       if (v.y < 340) busyBand.addAll(lanes);
     }
+    for (final o in obstacles) {
+      if (o.y - o.height / 2 < 90) busyTop.addAll({o.lane, o.lastLane});
+    }
     final free = [
       for (var i = 0; i < laneCount; i++)
         if (!busyTop.contains(i)) i,
     ]..shuffle(_rng);
-    final wanted =
-        _rng.nextDouble() < min(0.15 + level * 0.07, 0.55) ? 2 : 1;
+    final wanted = _rng.nextDouble() < min(0.15 + level * 0.07, 0.55) &&
+            !track.hasObstacles
+        ? 2
+        : 1;
 
     // Always leave at least one lane open near the top of the screen.
     final chosen = <int>[];
@@ -480,6 +634,8 @@ class BikeGame extends ChangeNotifier {
     final busy = {
       for (final v in vehicles)
         if (v.y < 260) v.x.round(),
+      for (final o in obstacles)
+        if (o.y < 60) ...{o.lane, o.lastLane},
     };
     final free = [
       for (var i = 0; i < laneCount; i++)
@@ -529,7 +685,11 @@ class BikeGame extends ChangeNotifier {
   }
 
   void _updateVehicles(double dt) {
-    final changeChance = level >= 2 ? min(0.08 + level * 0.04, 0.35) : 0.0;
+    // Cars keep to their lanes on an obstacle road, so a lane left open
+    // between obstacles stays open.
+    final changeChance = level >= 2 && !track.hasObstacles
+        ? min(0.08 + level * 0.04, 0.35)
+        : 0.0;
     for (final v in vehicles) {
       // Cars in the top part of the screen sometimes change lanes, after
       // blinking for a second so the player can react.
@@ -568,6 +728,16 @@ class BikeGame extends ChangeNotifier {
       v.y += (speed - v.speed) * dt;
     }
 
+    // A car that reaches a rock or barrier stops behind it.
+    for (final o in obstacles) {
+      if (!o.blocks) continue;
+      for (final v in vehicles) {
+        if (v.y <= o.y || !o.covers(v.lane)) continue;
+        final gap = (v.y - v.height / 2) - (o.y + o.height / 2);
+        if (gap < 40) v.speed = 0;
+      }
+    }
+
     // A car catching up with a slower one in its lane slows down behind it.
     for (final a in vehicles) {
       for (final b in vehicles) {
@@ -580,7 +750,7 @@ class BikeGame extends ChangeNotifier {
     for (final v in vehicles) {
       if (!v.passed && v.y - v.height / 2 > playerY + playerHeight / 2) {
         v.passed = true;
-        if (isRunning && invincibleTimer <= 0 && !boosting) {
+        if (isRunning && invincibleTimer <= 0 && !boosting && airTimer <= 0) {
           final dx = (laneCenter(v.x) - playerX).abs();
           if (dx < laneWidth * 1.1) _closeCall();
         }
@@ -647,12 +817,16 @@ class BikeGame extends ChangeNotifier {
     }
   }
 
+  Rect get _playerRect => Rect.fromCenter(
+        center: Offset(playerX, playerY),
+        width: playerWidth - 8,
+        height: playerHeight - 14,
+      );
+
   void _checkCollisions() {
-    final pr = Rect.fromCenter(
-      center: Offset(playerX, playerY),
-      width: playerWidth - 8,
-      height: playerHeight - 14,
-    );
+    // Up in the air, the bike flies over the traffic.
+    if (airTimer > 0) return;
+    final pr = _playerRect;
     for (final v in List.of(vehicles)) {
       final vr = Rect.fromCenter(
         center: Offset(laneCenter(v.x), v.y),
@@ -661,37 +835,38 @@ class BikeGame extends ChangeNotifier {
       );
       if (!pr.overlaps(vr)) continue;
       if (boosting || shieldTimer > 0) {
-        _smash(v, vr.center);
-        if (!boosting) {
-          shieldTimer = 0;
-          _addText('SHIELD USED', playerX, playerY - 90,
-              const Color(0xFF1DE9B6), size: 18);
-        }
+        vehicles.remove(v);
+        _smash(v.color, vr.center);
         continue;
       }
       if (invincibleTimer > 0) continue;
-      _crashInto(v, vr.center);
+      vehicles.remove(v);
+      _crash(v.color, vr.center);
       break;
     }
   }
 
-  void _smash(Vehicle v, Offset at) {
-    vehicles.remove(v);
+  /// Boost or a shield breaks what the bike hit; a shield is used up.
+  void _smash(Color color, Offset at) {
     score += 50;
     shake = max(shake, 8);
-    _burst(at.dx, at.dy, v.color, 22, 320);
+    _burst(at.dx, at.dy, color, 22, 320);
     _burst(at.dx, at.dy, const Color(0xFFFFAB00), 12, 260);
     _addText('SMASH +50', at.dx, at.dy, const Color(0xFFFF9100), size: 22);
     onImpact?.call(false);
+    if (!boosting) {
+      shieldTimer = 0;
+      _addText('SHIELD USED', playerX, playerY - 90, const Color(0xFF1DE9B6),
+          size: 18);
+    }
   }
 
-  void _crashInto(Vehicle v, Offset at) {
-    vehicles.remove(v);
+  void _crash(Color color, Offset at) {
     lives--;
     combo = 0;
     comboTimer = 0;
     shake = 16;
-    _burst(at.dx, at.dy, v.color, 26, 340);
+    _burst(at.dx, at.dy, color, 26, 340);
     _burst(playerX, playerY, const Color(0xFFFFD740), 16, 300);
     onImpact?.call(true);
     if (lives <= 0) {
@@ -707,6 +882,189 @@ class BikeGame extends ChangeNotifier {
       _addText('OUCH!', playerX, playerY - 70, const Color(0xFFFF5252),
           size: 28);
     }
+  }
+
+  // ------------------------------------------------------------ obstacles
+
+  /// Lays the next row of obstacles across the road, on tracks that have
+  /// them. Every row leaves a lane open, next to (or the same as) the one
+  /// the row before left open, so it can always be reached in time.
+  void _spawnObstacles(double dt) {
+    if (!track.hasObstacles) return;
+    _nextObstacles -= speed * dt;
+    if (_nextObstacles > 0) return;
+    const y = -50.0;
+
+    // The road stays put while cars drive on, so a row catches up with the
+    // cars below it. A lane with a car the row will be beside while on
+    // screen can't be the open one. A lane with a car right here gets
+    // nothing.
+    final carLanes = <int>{};
+    final here = <int>{};
+    for (final v in vehicles) {
+      final lanes = {v.lane, v.x.round()};
+      if ((v.y - y).abs() < v.height / 2 + 50) here.addAll(lanes);
+      if (v.speed <= 0 || v.y < y) continue;
+      final meet = v.y + (speed - v.speed) * (v.y - y) / v.speed;
+      if (meet < viewHeight + v.height) carLanes.addAll(lanes);
+    }
+    final open = [
+      for (final lane in [_openLane - 1, _openLane, _openLane + 1])
+        if (lane >= 0 && lane < laneCount && !carLanes.contains(lane)) lane,
+    ];
+    if (open.isEmpty) {
+      // Try again a little further on.
+      _nextObstacles = 120;
+      return;
+    }
+    _openLane = open[_rng.nextInt(open.length)];
+    _nextObstacles =
+        max(360.0, 600 - (level - 1) * 20.0) + _rng.nextDouble() * 240;
+
+    // Coins already on the road keep their lanes.
+    for (final p in pickups) {
+      if ((p.y - y).abs() < 70) here.add(p.lane);
+    }
+    final free = [
+      for (var lane = 0; lane < laneCount; lane++)
+        if (lane != _openLane && !here.contains(lane)) lane,
+    ]..shuffle(_rng);
+    final wanted = 1 + _rng.nextInt(level < 3 ? 1 : (level < 8 ? 2 : 3));
+    final taken = <int>{};
+    for (final lane in free) {
+      if (taken.length >= wanted) break;
+      if (taken.contains(lane)) continue;
+      var kind = _obstacleKind();
+      if (kind == ObstacleKind.barrier) {
+        if (free.contains(lane + 1) && !taken.contains(lane + 1)) {
+          taken.add(lane + 1);
+        } else {
+          kind = ObstacleKind.rock;
+        }
+      }
+      obstacles.add(Obstacle(kind, lane, y));
+      taken.add(lane);
+    }
+    // Now and then a ramp in the open lane, to fly over what comes next.
+    if (_rng.nextDouble() < 0.2) {
+      obstacles.add(Obstacle(ObstacleKind.ramp, _openLane, y));
+    }
+  }
+
+  /// Rocks and potholes from the start; oil from level 2 and barriers
+  /// from level 3.
+  ObstacleKind _obstacleKind() {
+    final roll = _rng.nextDouble();
+    if (level >= 3 && roll < 0.2) return ObstacleKind.barrier;
+    if (level >= 2 && roll >= 0.2 && roll < 0.4) return ObstacleKind.oil;
+    return roll < 0.72 ? ObstacleKind.rock : ObstacleKind.pothole;
+  }
+
+  void _updateObstacles(double dt) {
+    final d = speed * dt;
+    for (final o in obstacles) {
+      o.y += d;
+    }
+    obstacles.removeWhere((o) => o.y - o.height / 2 > viewHeight + 20);
+  }
+
+  void _checkObstacles() {
+    if (!isRunning || airTimer > 0) return;
+    final pr = _playerRect;
+    for (final o in List.of(obstacles)) {
+      if (o.hit) continue;
+      final r = Rect.fromCenter(
+        center: Offset(o.x, o.y),
+        width: o.width - 6,
+        height: o.height - 10,
+      );
+      if (!pr.overlaps(r)) continue;
+      switch (o.kind) {
+        case ObstacleKind.rock || ObstacleKind.barrier:
+          final color = o.kind == ObstacleKind.rock
+              ? const Color(0xFF8D8178)
+              : const Color(0xFFFF5722);
+          if (boosting || shieldTimer > 0) {
+            obstacles.remove(o);
+            _smash(color, r.center);
+          } else if (invincibleTimer <= 0) {
+            obstacles.remove(o);
+            _crash(color, r.center);
+            return;
+          }
+        case ObstacleKind.pothole:
+          o.hit = true;
+          // Boosting, the bike skims over it.
+          if (!boosting) _bump(r.center);
+        case ObstacleKind.oil:
+          o.hit = true;
+          _skid();
+        case ObstacleKind.ramp:
+          o.hit = true;
+          _jump();
+          return;
+      }
+    }
+  }
+
+  /// A pothole: the bike loses speed and the combo.
+  void _bump(Offset at) {
+    speed *= 0.6;
+    shake = max(shake, 10);
+    combo = 0;
+    comboTimer = 0;
+    _burst(at.dx, at.dy, const Color(0xFF757575), 12, 180);
+    _addText('POTHOLE!', playerX, playerY - 70, const Color(0xFFFFAB40),
+        size: 24);
+    onImpact?.call(false);
+  }
+
+  /// Oil sends the bike sliding a lane sideways, and it can't be steered
+  /// until the tyres grip again. It slides away from danger where it can.
+  void _skid() {
+    final lanes = [
+      for (final lane in [targetLane - 1, targetLane + 1])
+        if (lane >= 0 && lane < laneCount && !_dangerIn(lane)) lane,
+    ];
+    if (lanes.isNotEmpty) targetLane = lanes[_rng.nextInt(lanes.length)];
+    skidTimer = 0.6;
+    _addText('OIL SLICK!', playerX, playerY - 70, const Color(0xFFB388FF),
+        size: 24);
+    onImpact?.call(false);
+  }
+
+  /// Whether a rock, barrier or car is in [lane] right beside the bike.
+  bool _dangerIn(int lane) {
+    for (final o in obstacles) {
+      if (o.blocks &&
+          o.covers(lane) &&
+          (o.y - playerY).abs() < o.height / 2 + 80) {
+        return true;
+      }
+    }
+    for (final v in vehicles) {
+      if ((v.lane == lane || v.x.round() == lane) &&
+          (v.y - playerY).abs() < v.height / 2 + 80) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// A ramp: the bike flies for [jumpTime] seconds, over whatever is below.
+  void _jump() {
+    airTimer = jumpTime;
+    score += 100;
+    shake = max(shake, 4);
+    _addText('BIG AIR +100', playerX, playerY - 80, const Color(0xFFFFD740),
+        size: 24);
+  }
+
+  void _land() {
+    airTimer = 0;
+    shake = max(shake, 6);
+    _burst(playerX, playerY + 20, const Color(0xFFBCAAA4), 14, 160);
+    onImpact?.call(false);
   }
 
   // -------------------------------------------------------------- effects
