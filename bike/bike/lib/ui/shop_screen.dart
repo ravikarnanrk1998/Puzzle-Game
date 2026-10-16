@@ -301,7 +301,7 @@ class _ShopScreenState extends State<ShopScreen> {
           '${Catalog.versusCost} diamond. Joining a friend is free.\n'
           'Free diamonds: ${PlayerProgress.dailyDiamonds} every day on the '
           'menu, and 1 for every ${BikeGame.levelsPerDiamond} levels you '
-          'complete in a run.',
+          'complete in a run (not in 1 VS 1).',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white38, fontSize: 12),
         ),

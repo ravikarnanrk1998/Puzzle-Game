@@ -38,9 +38,22 @@ class BikeSkin {
 /// rocks, barriers, potholes, oil slicks and jump ramps on it.
 enum TrackTheme { highway, mountain }
 
+/// Which way the traffic on a track drives.
+enum TrafficFlow {
+  /// All of it the same way as the bike, which overtakes it.
+  sameWay,
+
+  /// All of it towards the bike.
+  oncoming,
+
+  /// The left half of the lanes the same way as the bike, the right half
+  /// towards it, with a line down the middle of the road.
+  twoWay,
+}
+
 /// A road to ride: one stage of the game. The first is open from the start.
 /// Each one after it unlocks by completing [unlockLevel] levels in a run on
-/// the one before, or straight away for coins or diamonds.
+/// the one before, or straight away for diamonds (and for some, coins).
 class Track {
   const Track({
     required this.id,
@@ -48,6 +61,7 @@ class Track {
     required this.name,
     required this.description,
     required this.theme,
+    this.traffic = TrafficFlow.sameWay,
     this.unlockLevel = 0,
     this.coinPrice = 0,
     this.diamondPrice = 0,
@@ -60,7 +74,11 @@ class Track {
   final String name;
   final String description;
   final TrackTheme theme;
+  final TrafficFlow traffic;
   final int unlockLevel;
+
+  /// Coins it costs to unlock straight away. 0 when it can't be bought
+  /// with coins.
   final int coinPrice;
   final int diamondPrice;
 
@@ -173,6 +191,48 @@ class Catalog {
       unlockLevel: 20,
       coinPrice: 100000,
       diamondPrice: 100,
+    ),
+    Track(
+      id: 'highway_oncoming',
+      stage: 3,
+      name: 'Head-On Highway',
+      description: 'The Green Highway, with all the traffic coming at you',
+      theme: TrackTheme.highway,
+      traffic: TrafficFlow.oncoming,
+      unlockLevel: 10,
+      diamondPrice: 150,
+    ),
+    Track(
+      id: 'mountain_oncoming',
+      stage: 4,
+      name: 'Head-On Pass',
+      description: 'The Mountain Pass, with all the traffic coming at you',
+      theme: TrackTheme.mountain,
+      traffic: TrafficFlow.oncoming,
+      unlockLevel: 10,
+      diamondPrice: 200,
+    ),
+    Track(
+      id: 'two_way',
+      stage: 5,
+      name: 'Two-Way Road',
+      description: 'The two left lanes go your way, and the two right lanes '
+          'come at you',
+      theme: TrackTheme.highway,
+      traffic: TrafficFlow.twoWay,
+      unlockLevel: 10,
+      diamondPrice: 250,
+    ),
+    Track(
+      id: 'mountain_two_way',
+      stage: 6,
+      name: 'Two-Way Pass',
+      description: 'The Mountain Pass, with the two left lanes going your '
+          'way and the two right lanes coming at you',
+      theme: TrackTheme.mountain,
+      traffic: TrafficFlow.twoWay,
+      unlockLevel: 10,
+      diamondPrice: 300,
     ),
   ];
 

@@ -1,28 +1,57 @@
 import 'package:flutter/material.dart';
 
 import '../account/account_service.dart';
+import '../shop/player_progress.dart';
+import 'avatar.dart';
 
 const _danger = Color(0xFFFF5252);
+const _gold = Color(0xFFFFC107);
 
 enum _Choice { logOut, delete }
 
-/// The popup behind the account button on the menu: log out, or delete the
-/// account.
-Future<void> showAccountDialog(
-    BuildContext context, AccountService account) async {
+/// The popup behind the account button on the menu: pick the avatar on
+/// the profile, log out, or delete the account.
+Future<void> showAccountDialog(BuildContext context, AccountService account,
+    PlayerProgress progress) async {
   final choice = await showDialog<_Choice>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(
-        account.name ?? 'Account',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+      scrollable: true,
+      title: Row(
+        children: [
+          ListenableBuilder(
+            listenable: progress,
+            builder: (context, _) =>
+                AvatarImage(avatar: Avatar.of(progress.avatar), size: 52),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              account.name ?? 'Account',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const Text(
+            'CHOOSE YOUR AVATAR',
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _AvatarPicker(progress: progress),
+          const SizedBox(height: 20),
           FilledButton.icon(
             onPressed: () => Navigator.of(context).pop(_Choice.logOut),
             icon: const Icon(Icons.logout_rounded),
@@ -49,6 +78,95 @@ Future<void> showAccountDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => _DeleteAccountDialog(account: account),
+    );
+  }
+}
+
+/// The avatars to choose from. The one on the profile has a gold ring, and
+/// tapping another puts it there straight away.
+class _AvatarPicker extends StatelessWidget {
+  const _AvatarPicker({required this.progress});
+
+  final PlayerProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: progress,
+      builder: (context, _) {
+        final current = Avatar.of(progress.avatar);
+        return Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 6,
+          runSpacing: 10,
+          children: [
+            for (final avatar in Avatar.values)
+              _AvatarChoice(
+                avatar: avatar,
+                selected: avatar == current,
+                onTap: () => progress.selectAvatar(avatar.name),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _AvatarChoice extends StatelessWidget {
+  const _AvatarChoice({
+    required this.avatar,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Avatar avatar;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 64,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? _gold : Colors.transparent,
+                      width: 3,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: AvatarImage(avatar: avatar, size: 50),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  avatar.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? _gold : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

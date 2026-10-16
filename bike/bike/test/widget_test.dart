@@ -7,6 +7,8 @@ import 'package:bike/shop/catalog.dart';
 import 'package:bike/shop/player_progress.dart';
 import 'package:bike/shop/store_service.dart';
 import 'package:bike/ui/game_screen.dart';
+import 'package:bike/ui/overlays.dart';
+import 'package:bike/ui/track_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -86,6 +88,19 @@ void main() {
       expect(g.diamondsEarned, 2);
       g.startGame();
       expect(g.diamondsEarned, 0, reason: 'counted per run');
+    });
+
+    test('levels earn no diamonds when level diamonds are off', () {
+      final g = newGame()
+        ..levelDiamonds = false
+        ..startGame();
+      var gifts = 0;
+      g.onDiamondEarned = () => gifts++;
+      g.distance = BikeGame.levelDistance * 20 - 0.01;
+      g.update(1 / 60);
+      expect(g.level, 21);
+      expect(gifts, 0);
+      expect(g.diamondsEarned, 0);
     });
 
     test('riding advances distance and score', () {
@@ -295,6 +310,123 @@ void main() {
     });
   });
 
+  group('Stages 3 to 6', () {
+    BikeGame gameOn(String id) => newGame()
+      ..setTrack(Catalog.track(id))
+      ..startGame();
+
+    test('each unlocks by completing level 10 on the stage before it', () {
+      for (final (before, next) in [
+        ('mountain', 'highway_oncoming'),
+        ('highway_oncoming', 'mountain_oncoming'),
+        ('mountain_oncoming', 'two_way'),
+        ('two_way', 'mountain_two_way'),
+      ]) {
+        final g = gameOn(before);
+        final earned = <Track>[];
+        g.onTrackEarned = (track) {
+          earned.add(track);
+          return true;
+        };
+        g.distance = BikeGame.levelDistance * 10 - 0.01;
+        g.update(1 / 60);
+        expect(g.level, 11);
+        expect(earned, [Catalog.track(next)]);
+      }
+    });
+
+    test('they are unlocked straight away with diamonds, not coins', () {
+      for (final track in Catalog.tracks.skip(2)) {
+        final p = PlayerProgress.memory()
+          ..addCoins(1000000)
+          ..addDiamonds(track.diamondPrice - 1);
+        expect(p.buyTrack(track), isFalse);
+        expect(p.buyTrack(track, withDiamonds: true), isFalse);
+        p.addDiamonds(1);
+        expect(p.buyTrack(track, withDiamonds: true), isTrue);
+        expect(p.diamonds, 0);
+        expect(p.selectedTrack, track);
+      }
+    });
+
+    test('on stages 3 and 4 all traffic comes at the bike, faster than the '
+        'road', () {
+      for (final id in ['highway_oncoming', 'mountain_oncoming']) {
+        final g = gameOn(id);
+        var moves = 0;
+        for (var i = 0; i < 60 * 30; i++) {
+          g.invincibleTimer = 10;
+          final before = {for (final v in g.vehicles) v: v.y};
+          g.update(1 / 60);
+          for (final v in g.vehicles) {
+            expect(v.oncoming, isTrue);
+            final y = before[v];
+            if (y == null) continue;
+            moves++;
+            expect(v.y - y, greaterThanOrEqualTo(g.speed / 60 - 1e-6));
+          }
+        }
+        expect(moves, greaterThan(0), reason: 'traffic on $id');
+      }
+    });
+
+    test('oncoming cars pull up behind rocks instead of driving through them',
+        () {
+      for (final id in ['mountain_oncoming', 'mountain_two_way']) {
+        final g = gameOn(id);
+        // Late levels, where rows are the fullest.
+        g.distance = BikeGame.levelDistance * 9;
+        var oncoming = 0;
+        for (var i = 0; i < 60 * 60; i++) {
+          g.invincibleTimer = 10;
+          g.update(1 / 60);
+          for (final v in g.vehicles) {
+            if (v.oncoming) oncoming++;
+            for (final o in g.obstacles) {
+              if (!o.blocks || !o.covers(v.lane)) continue;
+              expect((v.y - o.y).abs(), greaterThan((v.height + o.height) / 2),
+                  reason: 'a car drove into a ${o.kind.name} on $id');
+            }
+          }
+        }
+        expect(oncoming, greaterThan(0), reason: 'oncoming traffic on $id');
+      }
+    });
+
+    test('on stages 5 and 6 the left lanes go the way of the bike and the '
+        'right lanes come at it', () {
+      for (final id in ['two_way', 'mountain_two_way']) {
+        final g = gameOn(id);
+        // Cars change lanes from level 2.
+        g.distance = BikeGame.levelDistance * 5;
+        final kinds = <bool>{};
+        for (var i = 0; i < 60 * 60; i++) {
+          g.invincibleTimer = 10;
+          g.update(1 / 60);
+          for (final v in g.vehicles) {
+            kinds.add(v.oncoming);
+            expect(v.oncoming, v.lane >= 2);
+            expect(v.x.round() >= 2, v.oncoming, reason: 'stays on its side');
+          }
+        }
+        expect(kinds, {true, false}, reason: 'both ways on $id');
+      }
+    });
+
+    test('stage 6 is the mountain road, with obstacles', () {
+      final g = gameOn('mountain_two_way');
+      g.distance = BikeGame.levelDistance * 3;
+      for (var i = 0; i < 60 * 10; i++) {
+        g.invincibleTimer = 10;
+        g.update(1 / 60);
+      }
+      expect(g.obstacles, isNotEmpty);
+      expect(g.scenery.map((s) => s.kind),
+          everyElement(isIn(const [SceneryKind.pine, SceneryKind.boulder,
+              SceneryKind.pebbles])));
+    });
+  });
+
   group('PlayerProgress', () {
     test('banks run coins and tracks the best score', () {
       final p = PlayerProgress.memory();
@@ -491,7 +623,8 @@ void main() {
       progress: progress,
       store: StoreService(progress, enabled: false),
     ));
-    expect(find.text('TAP TO UNLOCK'), findsOneWidget);
+    final locked = Catalog.tracks.length - 1;
+    expect(find.text('TAP TO UNLOCK'), findsNWidgets(locked));
     await tester.tap(find.text('Mountain Pass'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
@@ -501,7 +634,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(progress.wallet, 0);
     expect(progress.selectedTrack, mountain);
-    expect(find.text('TAP TO UNLOCK'), findsNothing);
+    expect(find.text('TAP TO UNLOCK'), findsNWidgets(locked - 1));
     // Let the "unlocked" message finish showing.
     await tester.pump(const Duration(seconds: 5));
     await tester.pump(const Duration(seconds: 1));
@@ -511,6 +644,36 @@ void main() {
     final road = tester.widget<CustomPaint>(find.byWidgetPredicate(
         (w) => w is CustomPaint && w.painter is GamePainter));
     expect((road.painter! as GamePainter).game.track, mountain);
+  });
+
+  testWidgets('the menu fits a small phone without scrolling, with how to '
+      'play behind the info button', (tester) async {
+    tester.view
+      ..physicalSize = const Size(360 * 3, 640 * 3)
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final progress = PlayerProgress.memory();
+    await tester.pumpWidget(BikeRushApp(
+      progress: progress,
+      store: StoreService(progress, enabled: false),
+    ));
+    await tester.pump();
+    final scrolls = tester.widgetList<Scrollable>(find.descendant(
+        of: find.byType(MenuOverlay), matching: find.byType(Scrollable)));
+    expect(scrolls.map((s) => s.axisDirection), [AxisDirection.right],
+        reason: 'only the row of stages scrolls');
+    expect(find.byType(TrackPreview), findsNWidgets(Catalog.tracks.length));
+
+    expect(find.text('HOW TO PLAY'), findsNothing);
+    await tester.tap(find.byTooltip('How to play'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('HOW TO PLAY'), findsOneWidget);
+    expect(find.textContaining('Stage 5: Two-Way Road'), findsOneWidget);
+    await tester.tap(find.text('GOT IT'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('HOW TO PLAY'), findsNothing);
   });
 
   testWidgets('GARAGE opens the shop', (tester) async {

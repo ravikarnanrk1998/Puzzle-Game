@@ -36,6 +36,7 @@ class PlayerProgress extends ChangeNotifier {
   static const _kDailyClaim = 'daily_claim';
   static const _kTracks = 'unlocked_tracks';
   static const _kTrack = 'selected_track';
+  static const _kAvatar = 'avatar';
 
   /// Diamonds given by the free daily claim.
   static const dailyDiamonds = 1;
@@ -62,6 +63,10 @@ class PlayerProgress extends ChangeNotifier {
   /// The track the next run is on. Kept on this device only.
   String trackId = Catalog.tracks.first.id;
 
+  /// The cartoon picture on the player's profile, by name. Null until the
+  /// player picks one.
+  String? avatar;
+
   /// The account this progress belongs to. Null for progress made without
   /// signing in.
   String? owner;
@@ -85,6 +90,7 @@ class PlayerProgress extends ChangeNotifier {
         delivered: [..._delivered],
         dailyClaim: dailyClaim,
         tracks: {...tracks},
+        avatar: avatar,
       );
 
   /// Replaces all progress, e.g. with the player's cloud save.
@@ -102,6 +108,7 @@ class PlayerProgress extends ChangeNotifier {
       ..addAll(data.delivered);
     tracks = {...data.tracks};
     _checkTrack();
+    avatar = data.avatar;
     this.owner = owner;
     _save();
   }
@@ -127,6 +134,7 @@ class PlayerProgress extends ChangeNotifier {
     tracks = {...?p.getStringList(_kTracks)};
     trackId = p.getString(_kTrack) ?? Catalog.tracks.first.id;
     _checkTrack();
+    avatar = p.getString(_kAvatar);
   }
 
   /// Back to the first track if the picked one is not unlocked (any more).
@@ -159,6 +167,12 @@ class PlayerProgress extends ChangeNotifier {
       }
       p.setStringList(_kTracks, tracks.toList());
       p.setString(_kTrack, trackId);
+      final avatar = this.avatar;
+      if (avatar == null) {
+        p.remove(_kAvatar);
+      } else {
+        p.setString(_kAvatar, avatar);
+      }
     }
     notifyListeners();
   }
@@ -273,6 +287,13 @@ class PlayerProgress extends ChangeNotifier {
   void selectTrack(Track track) {
     if (!hasTrack(track) || trackId == track.id) return;
     trackId = track.id;
+    _save();
+  }
+
+  /// Puts the avatar called [id] on the player's profile.
+  void selectAvatar(String id) {
+    if (avatar == id) return;
+    avatar = id;
     _save();
   }
 

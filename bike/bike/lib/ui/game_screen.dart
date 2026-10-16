@@ -147,6 +147,8 @@ class _GameScreenState extends State<GameScreen>
 
   void _start() {
     _game.setTrack(_track);
+    // Levels earn diamonds in solo runs only, not in a 1 vs 1 match.
+    _game.levelDiamonds = _versus == null;
     _game.startGame();
     _focus.requestFocus();
   }
@@ -261,7 +263,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> _openAccount() async {
-    await showAccountDialog(context, widget.account!);
+    await showAccountDialog(context, widget.account!, widget.progress);
     // Logging out or deleting the account replaces this screen with the
     // login screen.
     if (mounted) _focus.requestFocus();
@@ -438,7 +440,6 @@ class _GameScreenState extends State<GameScreen>
           return VersusResultOverlay(
             match: versus,
             coinsEarned: widget.progress.lastRun?.coinsEarned ?? 0,
-            diamondsEarned: _game.diamondsEarned,
             onLeave: _leaveVersus,
           );
         }

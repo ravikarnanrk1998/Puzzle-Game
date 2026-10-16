@@ -6,6 +6,8 @@ import 'package:bike/shop/catalog.dart';
 import 'package:bike/shop/player_progress.dart';
 import 'package:bike/shop/save_data.dart';
 import 'package:bike/shop/store_service.dart';
+import 'package:bike/ui/avatar.dart';
+import 'package:bike/ui/overlays.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -107,6 +109,22 @@ void main() {
       expect(server.saves['ravi'], phone.data);
       expect(server.saves['ravi']!.wallet, 120);
       expect(server.saves['ravi']!.owned, {'red', 'blue'});
+    });
+
+    test('the picked avatar follows the account, and stays with it on '
+        'signing out', () async {
+      await cloud.attach('ravi');
+      phone.selectAvatar('oldMan');
+      await pumpEventQueue();
+      expect(server.saves['ravi']!.avatar, 'oldMan');
+
+      final tablet = PlayerProgress.memory();
+      await CloudSave(tablet, server).attach('ravi');
+      expect(tablet.avatar, 'oldMan');
+
+      cloud.detach();
+      expect(phone.avatar, isNull);
+      expect(server.saves['ravi']!.avatar, 'oldMan');
     });
 
     test('a save comes back on a new phone', () async {
@@ -346,6 +364,50 @@ void main() {
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(progress.wallet, 0);
     expect(server.saves[email]!.wallet, 42000);
+  });
+
+  testWidgets('the profile shows the avatar picked in the account popup',
+      (tester) async {
+    const email = 'ravi@example.com';
+    final server = FakeSaves();
+    final progress = PlayerProgress.memory();
+    final account = TestAccount(CloudSave(progress, server));
+    await tester.pumpWidget(BikeRushApp(
+      progress: progress,
+      store: StoreService(progress, enabled: false),
+      account: account,
+    ));
+    await account.signInWithEmail(email, 'secret1');
+    await tester.pump();
+    await tester.pump();
+
+    Future<void> tapAndWait(Finder finder) async {
+      await tester.tap(finder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    Avatar onProfile() => tester
+        .widget<AvatarImage>(find.descendant(
+            of: find.byType(MenuOverlay), matching: find.byType(AvatarImage)))
+        .avatar;
+
+    expect(onProfile(), Avatar.kid, reason: 'until one is picked');
+    await tapAndWait(find.text(email));
+    expect(find.text('CHOOSE YOUR AVATAR'), findsOneWidget);
+    for (final avatar in Avatar.values) {
+      expect(find.text(avatar.label), findsOneWidget);
+    }
+    await tapAndWait(find.text('Old woman'));
+    expect(progress.avatar, 'oldWoman');
+
+    // Closing the popup, the profile has it too.
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('CHOOSE YOUR AVATAR'), findsNothing);
+    expect(onProfile(), Avatar.oldWoman);
+    expect(server.saves[email]!.avatar, 'oldWoman');
   });
 
   testWidgets('deleting the account asks first, then removes everything',

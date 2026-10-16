@@ -8,6 +8,7 @@ import '../shop/catalog.dart';
 import '../shop/player_progress.dart';
 import '../versus/match_backend.dart';
 import '../versus/versus_match.dart';
+import 'avatar.dart';
 import 'track_picker.dart';
 
 const _gold = Color(0xFFFFC107);
@@ -224,15 +225,20 @@ class Hud extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip({required this.child, this.color = const Color(0xB3101521)});
+  const _Chip({
+    required this.child,
+    this.color = const Color(0xB3101521),
+    this.padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+  });
 
   final Widget child;
   final Color color;
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: padding,
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(14),
@@ -244,25 +250,36 @@ class _Chip extends StatelessWidget {
 }
 
 class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.onTap});
+  const _RoundButton({
+    required this.icon,
+    required this.onTap,
+    this.iconSize = 26,
+    this.padding = 10,
+    this.tooltip,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
+  final double iconSize;
+  final double padding;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final button = Material(
       color: const Color(0xB3101521),
       shape: const CircleBorder(side: BorderSide(color: Colors.white24)),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Icon(icon, color: Colors.white, size: 26),
+          padding: EdgeInsets.all(padding),
+          child: Icon(icon, color: Colors.white, size: iconSize),
         ),
       ),
     );
+    final tooltip = this.tooltip;
+    return tooltip == null ? button : Tooltip(message: tooltip, child: button);
   }
 }
 
@@ -432,12 +449,19 @@ class BigButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.colors = const [Color(0xFFFF9800), Color(0xFFFF3D00)],
+    this.width = 240,
+    this.height = 60,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onTap;
   final List<Color> colors;
+
+  /// The size it asks for. A parent that sets its width, such as an
+  /// [Expanded], wins.
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -460,30 +484,33 @@ class BigButton extends StatelessWidget {
           borderRadius: radius,
           onTap: onTap,
           child: SizedBox(
-            width: 240,
-            height: 60,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: Colors.white, size: 32),
-                const SizedBox(width: 8),
-                // Long labels shrink to fit rather than spill out.
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        fontStyle: FontStyle.italic,
-                        letterSpacing: 1.5,
+            width: width,
+            height: height,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: Colors.white, size: 32),
+                  const SizedBox(width: 8),
+                  // Long labels shrink to fit rather than spill out.
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          fontStyle: FontStyle.italic,
+                          letterSpacing: 1.5,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -656,10 +683,17 @@ class MenuOverlay extends StatelessWidget {
   final String? accountName;
   final VoidCallback? onAccount;
 
+  /// How wide the buttons are.
+  static const double _buttonsWidth = 300;
+
   @override
   Widget build(BuildContext context) {
     final pulse = 1 + sin(game.time * 4) * 0.04;
     final bike = progress.selectedBike;
+    // A very dark bike would vanish on the dark pill: its accent shows.
+    final bikeColor =
+        bike.color.computeLuminance() < 0.05 ? bike.accent : bike.color;
+    final open = Catalog.tracks.where(progress.hasTrack).length;
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -669,143 +703,269 @@ class MenuOverlay extends StatelessWidget {
         ),
       ),
       child: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            Center(
-              child: SingleChildScrollView(
-                // Starts below the top bar, which is a row taller while
-                // the daily claim is showing.
-                padding: EdgeInsets.fromLTRB(
-                    24, onClaimDaily == null ? 56 : 100, 24, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const GameTitle(),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Dodge traffic • Grab coins • Fire the NITRO',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: TrackPicker(progress: progress, onTap: onTrack),
-                    ),
-                    const SizedBox(height: 14),
-                    Text('RIDING: ${bike.name.toUpperCase()}',
-                        style: _labelStyle.copyWith(color: bike.color)),
-                    const SizedBox(height: 12),
-                    Transform.scale(
-                      scale: pulse,
-                      // Drawn once and then only scaled, instead of
-                      // redrawing the button and its shadow every frame.
-                      child: RepaintBoundary(
-                        child: BigButton(
-                          label: 'PLAY',
-                          icon: Icons.play_arrow_rounded,
-                          onTap: onPlay,
-                        ),
-                      ),
-                    ),
-                    if (onVersus != null) ...[
-                      const SizedBox(height: 14),
-                      BigButton(
-                        label: '1 VS 1',
-                        icon: Icons.people_alt_rounded,
-                        onTap: onVersus!,
-                        colors: const [Color(0xFFFF4081), Color(0xFFC51162)],
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    BigButton(
-                      label: 'GARAGE',
-                      icon: Icons.storefront_rounded,
-                      onTap: onShop,
-                      colors: const [Color(0xFF7C4DFF), Color(0xFF304FFE)],
-                    ),
-                    if (progress.best > 0) ...[
-                      const SizedBox(height: 18),
-                      Row(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+              child: _topBar(context),
+            ),
+            // The rest fits on one screen: on a short one it is scaled
+            // down to fit, never scrolled.
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) => FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: SizedBox(
+                    width: constraints.maxWidth,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.emoji_events, color: _gold),
-                          const SizedBox(width: 6),
-                          Text(
-                            'BEST  ${formatNumber(progress.best)}',
-                            style: const TextStyle(
-                              color: _gold,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
+                          const GameTitle(),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Dodge traffic • Grab coins • Fire the NITRO',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            child: Row(
+                              children: [
+                                const Text('CHOOSE A STAGE',
+                                    style: _labelStyle),
+                                const Spacer(),
+                                Text(
+                                  '$open / ${Catalog.tracks.length} OPEN',
+                                  style: _labelStyle.copyWith(color: _gold),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TrackPicker(progress: progress, onTap: onTrack),
+                          const SizedBox(height: 18),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _StatPill(
+                                icon: Icons.two_wheeler,
+                                color: bikeColor,
+                                text: bike.name.toUpperCase(),
+                              ),
+                              if (progress.best > 0)
+                                _StatPill(
+                                  icon: Icons.emoji_events,
+                                  color: _gold,
+                                  text: 'BEST  ${formatNumber(progress.best)}',
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          Transform.scale(
+                            scale: pulse,
+                            // Drawn once and then only scaled, instead of
+                            // redrawing the button and its shadow every
+                            // frame.
+                            child: RepaintBoundary(
+                              child: BigButton(
+                                label: 'PLAY',
+                                icon: Icons.play_arrow_rounded,
+                                onTap: onPlay,
+                                width: _buttonsWidth,
+                                height: 66,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: _buttonsWidth,
+                            child: Row(
+                              children: [
+                                if (onVersus != null) ...[
+                                  Expanded(
+                                    child: BigButton(
+                                      label: '1 VS 1',
+                                      icon: Icons.people_alt_rounded,
+                                      onTap: onVersus!,
+                                      height: 56,
+                                      colors: const [
+                                        Color(0xFFFF4081),
+                                        Color(0xFFC51162),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
+                                Expanded(
+                                  child: BigButton(
+                                    label: 'GARAGE',
+                                    icon: Icons.storefront_rounded,
+                                    onTap: onShop,
+                                    height: 56,
+                                    colors: const [
+                                      Color(0xFF7C4DFF),
+                                      Color(0xFF304FFE),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ],
-                    const SizedBox(height: 26),
-                    _HowToPlay(diamonds: onVersus != null),
-                  ],
+                    ),
+                  ),
                 ),
               ),
             ),
-            // Top bar: the account on the left, diamonds and coins on the
-            // right, with the daily claim under them while it is waiting.
-            Positioned(
-              top: 10,
-              left: 10,
-              right: 10,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Gives way to the balances on a narrow screen.
-                  Flexible(
-                    child: onAccount == null
-                        ? const SizedBox.shrink()
-                        : _AccountChip(name: accountName, onTap: onAccount!),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (onVersus != null) ...[
-                            DiamondChip(count: progress.diamonds),
-                            const SizedBox(width: 8),
-                          ],
-                          WalletChip(
-                            coins: progress.wallet,
-                            doubled: progress.doubleCoins,
-                          ),
-                        ],
-                      ),
-                      if (onClaimDaily != null) ...[
-                        const SizedBox(height: 8),
-                        _DailyClaimButton(onTap: onClaimDaily!),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            const _DeveloperCredit(),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The account on the left; diamonds, coins and the how to play button
+  /// on the right, with the daily claim under them while it is waiting.
+  Widget _topBar(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Gives way to the balances on a narrow screen.
+        Expanded(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: onAccount == null
+                ? const SizedBox.shrink()
+                : _AccountChip(
+                    name: accountName,
+                    avatar: Avatar.of(progress.avatar),
+                    onTap: onAccount!,
+                  ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onVersus != null) ...[
+                  DiamondChip(count: progress.diamonds),
+                  const SizedBox(width: 8),
+                ],
+                WalletChip(
+                  coins: progress.wallet,
+                  doubled: progress.doubleCoins,
+                ),
+                const SizedBox(width: 8),
+                _RoundButton(
+                  icon: Icons.info_outline_rounded,
+                  iconSize: 22,
+                  padding: 8,
+                  tooltip: 'How to play',
+                  onTap: () =>
+                      _showHowToPlay(context, diamonds: onVersus != null),
+                ),
+              ],
+            ),
+            if (onClaimDaily != null) ...[
+              const SizedBox(height: 8),
+              _DailyClaimButton(onTap: onClaimDaily!),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// A small fact on the menu, such as the bike being ridden.
+class _StatPill extends StatelessWidget {
+  const _StatPill({
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Chip(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 6),
+          Text(text, style: _smallStyle.copyWith(color: color, letterSpacing: 1)),
+        ],
+      ),
+    );
+  }
+}
+
+/// The how to play notes, opened from the info button on the menu.
+void _showHowToPlay(BuildContext context, {required bool diamonds}) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      child: _HowToPlay(diamonds: diamonds),
+    ),
+  );
+}
+
+/// "Developed by" and the developer's logo, along the bottom of the menu.
+class _DeveloperCredit extends StatelessWidget {
+  const _DeveloperCredit();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Developed by ',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Image.asset('assets/image/develop.png',
+              height: 22, fit: BoxFit.contain),
+        ],
       ),
     );
   }
 }
 
 class _AccountChip extends StatelessWidget {
-  const _AccountChip({required this.name, required this.onTap});
+  const _AccountChip({
+    required this.name,
+    required this.avatar,
+    required this.onTap,
+  });
 
   final String? name;
+  final Avatar avatar;
   final VoidCallback onTap;
 
   @override
@@ -813,11 +973,12 @@ class _AccountChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: _Chip(
+        padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.account_circle, color: Colors.white, size: 22),
-            const SizedBox(width: 6),
+            AvatarImage(avatar: avatar, size: 28),
+            const SizedBox(width: 8),
             Flexible(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 120),
@@ -869,11 +1030,15 @@ class GameTitle extends StatelessWidget {
   }
 }
 
+/// The how to play notes: the controls and tips, then each stage and how
+/// to unlock it. Shown in a dialog, and scrolls if the screen is short.
 class _HowToPlay extends StatelessWidget {
   const _HowToPlay({required this.diamonds});
 
   /// Whether diamonds are part of the game here (they need an account).
   final bool diamonds;
+
+  static const _textStyle = TextStyle(color: Colors.white70, fontSize: 14);
 
   @override
   Widget build(BuildContext context) {
@@ -881,50 +1046,123 @@ class _HowToPlay extends StatelessWidget {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.linux;
-    final rows = [
+    final tips = [
       (Icons.touch_app, 'Tap or swipe left / right to switch lanes'),
       if (hasKeyboard)
         (Icons.keyboard, 'Keyboard: ← → or A / D, Space = boost'),
       (Icons.monetization_on, 'Coins and close calls charge your NITRO'),
       (Icons.bolt, 'Boost smashes through traffic for points'),
       (Icons.storefront_rounded, 'Spend coins on faster-starting bikes'),
-      for (final track in Catalog.tracks.skip(1))
-        (
-          Icons.terrain_rounded,
-          'Complete level ${track.unlockLevel} on Stage ${track.stage - 1} '
-              'to unlock Stage ${track.stage}: ${track.name}',
-        ),
       if (diamonds)
         (
           Icons.diamond,
           'Every ${BikeGame.levelsPerDiamond} levels you complete in a run '
-              'gives a free diamond',
+              'gives a free diamond (not in 1 vs 1)',
         ),
     ];
+    void close() => Navigator.of(context).pop();
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('HOW TO PLAY', style: _labelStyle),
-          const SizedBox(height: 10),
-          for (final (icon, text) in rows)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Icon(icon, color: _gold, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      text,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 14),
-                    ),
+          Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: _gold, size: 22),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'HOW TO PLAY',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: 1,
                   ),
+                ),
+              ),
+              IconButton(
+                onPressed: close,
+                tooltip: 'Close',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.close_rounded, color: Colors.white70),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final (icon, text) in tips)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Row(
+                        children: [
+                          Icon(icon, color: _gold, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(text, style: _textStyle)),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                  const Text('STAGES', style: _labelStyle),
+                  const SizedBox(height: 6),
+                  for (final track in Catalog.tracks)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.flag_rounded,
+                              color: _gold, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text.rich(
+                              TextSpan(
+                                style: _textStyle,
+                                children: [
+                                  TextSpan(
+                                    text: 'Stage ${track.stage}: '
+                                        '${track.name}\n',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  TextSpan(text: track.description),
+                                  if (!track.isFree)
+                                    TextSpan(
+                                      text: '\nUnlock: complete level '
+                                          '${track.unlockLevel} on Stage '
+                                          '${track.stage - 1}',
+                                      style: const TextStyle(
+                                          color: Color(0xFFFFE082)),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 18),
+          Center(
+            child: BigButton(
+              label: 'GOT IT',
+              icon: Icons.check_rounded,
+              onTap: close,
+              width: 200,
+              height: 52,
+              colors: const [Color(0xFF00C853), Color(0xFF00897B)],
+            ),
+          ),
         ],
       ),
     );
@@ -1364,15 +1602,11 @@ class VersusResultOverlay extends StatelessWidget {
     super.key,
     required this.match,
     required this.coinsEarned,
-    this.diamondsEarned = 0,
     required this.onLeave,
   });
 
   final VersusMatch match;
   final int coinsEarned;
-
-  /// Diamonds the run earned by completing levels.
-  final int diamondsEarned;
   final VoidCallback onLeave;
 
   @override
@@ -1497,11 +1731,6 @@ class VersusResultOverlay extends StatelessWidget {
                         Text('+$coinsEarned coins', style: _smallStyle),
                       ],
                     ),
-                    if (diamondsEarned > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: _LevelDiamonds(count: diamondsEarned),
-                      ),
                     const SizedBox(height: 20),
                     BigButton(
                       label: 'MENU',

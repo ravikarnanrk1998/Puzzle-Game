@@ -43,6 +43,7 @@ class FakeSaves implements SaveBackend {
       delivered: {...s.delivered, ...d.orders}.toList(),
       dailyClaim: d.dailyClaim ?? s.dailyClaim,
       tracks: {...s.tracks, ...d.tracks},
+      avatar: d.avatar ?? s.avatar,
     );
     notify();
   }

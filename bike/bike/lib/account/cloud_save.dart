@@ -164,7 +164,9 @@ class FirestoreSaves implements SaveBackend {
     int number(Object? v) => v is num ? v.toInt() : 0;
     List<String> strings(Object? v) =>
         v is List ? v.whereType<String>().toList() : const [];
-    final selected = doc['selected'], dailyClaim = doc['dailyClaim'];
+    final selected = doc['selected'],
+        dailyClaim = doc['dailyClaim'],
+        avatar = doc['avatar'];
     return SaveData(
       wallet: number(doc['wallet']),
       diamonds: number(doc['diamonds']),
@@ -175,6 +177,7 @@ class FirestoreSaves implements SaveBackend {
       delivered: strings(doc['delivered']),
       dailyClaim: dailyClaim is String ? dailyClaim : null,
       tracks: strings(doc['tracks']).toSet(),
+      avatar: avatar is String ? avatar : null,
     );
   }
 
@@ -192,6 +195,7 @@ class FirestoreSaves implements SaveBackend {
       if (delta.bikes.isNotEmpty)
         'owned': FieldValue.arrayUnion(delta.bikes.toList()),
       if (delta.selected != null) 'selected': delta.selected,
+      if (delta.avatar != null) 'avatar': delta.avatar,
       if (delta.orders.isNotEmpty)
         'delivered': FieldValue.arrayUnion(delta.orders),
       if (delta.tracks.isNotEmpty)

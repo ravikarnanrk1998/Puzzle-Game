@@ -21,6 +21,7 @@ class Vehicle {
     required this.speed,
     required this.color,
     this.kind = VehicleKind.car,
+    this.oncoming = false,
   }) : x = lane.toDouble();
 
   /// Lane the vehicle is in, or is moving towards during a lane change.
@@ -34,6 +35,10 @@ class Vehicle {
   double speed;
   final Color color;
   final VehicleKind kind;
+
+  /// Drives towards the bike instead of the same way, so it comes down the
+  /// screen faster than the road does.
+  final bool oncoming;
 
   /// Set once the vehicle has gone past the player (used for close calls).
   bool passed = false;
@@ -177,6 +182,9 @@ class BikeGame extends ChangeNotifier {
   /// Levels to complete for each free diamond.
   static const int levelsPerDiamond = 10;
 
+  /// Whether completing levels earns diamonds. Off for 1 vs 1 matches.
+  bool levelDiamonds = true;
+
   /// Called when a run completes the level that unlocks the next track
   /// ([Track.unlockLevel]). Returns true if that track was locked until
   /// now.
@@ -264,6 +272,17 @@ class BikeGame extends ChangeNotifier {
   bool get isRunning => phase == GamePhase.playing;
   bool get canBoost => isRunning && !boosting && nitro >= minBoost;
   double get _baseSpeed => min(360 + (level - 1) * 40.0, 780);
+
+  /// Whether the traffic in [lane] drives towards the bike.
+  bool oncomingLane(int lane) => switch (track.traffic) {
+        TrafficFlow.sameWay => false,
+        TrafficFlow.oncoming => true,
+        TrafficFlow.twoWay => lane >= laneCount ~/ 2,
+      };
+
+  /// How fast [v] comes down the screen.
+  double _screenSpeed(Vehicle v) =>
+      v.oncoming ? speed + v.speed : speed - v.speed;
 
   void resize(Size size) {
     if (size.isEmpty) return;
@@ -462,7 +481,7 @@ class BikeGame extends ChangeNotifier {
       levelBannerTimer = 2.2;
       score += 100;
       // Level 10, 20, 30... completed: a free diamond.
-      if ((level - 1) % levelsPerDiamond == 0) {
+      if (levelDiamonds && (level - 1) % levelsPerDiamond == 0) {
         diamondsEarned++;
         _addText('+1 DIAMOND', worldWidth / 2, viewHeight * 0.3 + 86,
             const Color(0xFF40C4FF),
@@ -599,7 +618,7 @@ class BikeGame extends ChangeNotifier {
     }
     final free = [
       for (var i = 0; i < laneCount; i++)
-        if (!busyTop.contains(i)) i,
+        if (!busyTop.contains(i) && _canSpawnIn(i)) i,
     ]..shuffle(_rng);
     final wanted = _rng.nextDouble() < min(0.15 + level * 0.07, 0.55) &&
             !track.hasObstacles
@@ -612,22 +631,51 @@ class BikeGame extends ChangeNotifier {
       if (chosen.length >= wanted) break;
       if ({...busyBand, ...chosen, lane}.length < laneCount) chosen.add(lane);
     }
+    if (chosen.isEmpty &&
+        track.hasObstacles &&
+        track.traffic != TrafficFlow.sameWay) {
+      // Oncoming cars wait for a lane they can pull up in: try again soon.
+      _nextTraffic = 80;
+      return;
+    }
 
     for (final lane in chosen) {
       final truck = _rng.nextDouble() < 0.18;
-      final factor = truck
-          ? 0.30 + _rng.nextDouble() * 0.12
-          : 0.36 + _rng.nextDouble() * 0.24;
+      final oncoming = oncomingLane(lane);
+      // Oncoming traffic drives slowly, as the bike's own speed adds to how
+      // fast it comes down the screen.
+      final factor = switch ((oncoming, truck)) {
+        (false, true) => 0.30 + _rng.nextDouble() * 0.12,
+        (false, false) => 0.36 + _rng.nextDouble() * 0.24,
+        (true, true) => 0.08 + _rng.nextDouble() * 0.06,
+        (true, false) => 0.12 + _rng.nextDouble() * 0.12,
+      };
       final v = Vehicle(
         lane: lane,
         y: 0,
         speed: _baseSpeed * factor,
         color: carColors[_rng.nextInt(carColors.length)],
         kind: truck ? VehicleKind.truck : VehicleKind.car,
+        oncoming: oncoming,
       );
       v.y = -v.height / 2 - 10;
       vehicles.add(v);
     }
+  }
+
+  /// Whether a car can start down [lane] from the top of the screen. On an
+  /// obstacle road an oncoming car would catch up with the rows of
+  /// obstacles ahead of it, and must not come through one in the lane it
+  /// leaves open. So it only takes a lane that the first row below it
+  /// blocks with a rock or barrier, and pulls up behind that.
+  bool _canSpawnIn(int lane) {
+    if (!track.hasObstacles || !oncomingLane(lane)) return true;
+    double? row;
+    for (final o in obstacles) {
+      if (o.y < playerY && (row == null || o.y < row)) row = o.y;
+    }
+    return row == null ||
+        obstacles.any((o) => o.y == row && o.blocks && o.covers(lane));
   }
 
   int _freeLane() {
@@ -692,15 +740,21 @@ class BikeGame extends ChangeNotifier {
         : 0.0;
     for (final v in vehicles) {
       // Cars in the top part of the screen sometimes change lanes, after
-      // blinking for a second so the player can react.
+      // blinking for a second so the player can react. Oncoming cars come
+      // too fast for that, and no car crosses to the other side of a
+      // two-way road.
       if (v.kind == VehicleKind.car &&
+          !v.oncoming &&
           !v.indicating &&
           v.y > 30 &&
           v.y < viewHeight * 0.4 &&
           _rng.nextDouble() < dt * changeChance) {
         final dir = _rng.nextBool() ? 1 : -1;
         final target = v.lane + dir;
-        if (target >= 0 && target < laneCount && _laneClear(target, v)) {
+        if (target >= 0 &&
+            target < laneCount &&
+            !oncomingLane(target) &&
+            _laneClear(target, v)) {
           v.signalDir = dir;
           v.signal = 1.0;
         }
@@ -725,25 +779,38 @@ class BikeGame extends ChangeNotifier {
           v.x += step * d.sign;
         }
       }
-      v.y += (speed - v.speed) * dt;
+      v.y += _screenSpeed(v) * dt;
     }
 
-    // A car that reaches a rock or barrier stops behind it.
+    // A car that reaches a rock or barrier stops behind it: below it when
+    // the car drives the bike's way, above it when the car comes the other
+    // way.
     for (final o in obstacles) {
       if (!o.blocks) continue;
       for (final v in vehicles) {
-        if (v.y <= o.y || !o.covers(v.lane)) continue;
-        final gap = (v.y - v.height / 2) - (o.y + o.height / 2);
+        if (!o.covers(v.lane) || (v.oncoming ? v.y >= o.y : v.y <= o.y)) {
+          continue;
+        }
+        final gap = v.oncoming
+            ? (o.y - o.height / 2) - (v.y + v.height / 2)
+            : (v.y - v.height / 2) - (o.y + o.height / 2);
         if (gap < 40) v.speed = 0;
       }
     }
 
     // A car catching up with a slower one in its lane slows down behind it.
+    // Of two cars in a lane, the upper one (a) is behind when they come
+    // towards the bike, and ahead when they drive its way.
     for (final a in vehicles) {
       for (final b in vehicles) {
         if (identical(a, b) || a.y >= b.y || (a.x - b.x).abs() > 0.8) continue;
         final gap = (b.y - b.height / 2) - (a.y + a.height / 2);
-        if (gap < 40 && b.speed > a.speed) b.speed = a.speed;
+        if (gap >= 40) continue;
+        if (a.oncoming) {
+          if (a.speed > b.speed) a.speed = b.speed;
+        } else if (b.speed > a.speed) {
+          b.speed = a.speed;
+        }
       }
     }
 
@@ -904,6 +971,12 @@ class BikeGame extends ChangeNotifier {
     for (final v in vehicles) {
       final lanes = {v.lane, v.x.round()};
       if ((v.y - y).abs() < v.height / 2 + 50) here.addAll(lanes);
+      if (v.oncoming) {
+        // One coming the other way meets the row if it is above it, and
+        // one not far below it is in the way of getting to the open lane.
+        if (v.y < y + 400) carLanes.addAll(lanes);
+        continue;
+      }
       if (v.speed <= 0 || v.y < y) continue;
       final meet = v.y + (speed - v.speed) * (v.y - y) / v.speed;
       if (meet < viewHeight + v.height) carLanes.addAll(lanes);

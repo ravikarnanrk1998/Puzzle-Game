@@ -16,6 +16,7 @@ class SaveData {
     this.delivered = const [],
     this.dailyClaim,
     this.tracks = const {},
+    this.avatar,
   });
 
   final int wallet;
@@ -24,6 +25,9 @@ class SaveData {
   final bool doubleCoins;
   final Set<String> owned;
   final String? selected;
+
+  /// The profile picture the player picked, or null if they never have.
+  final String? avatar;
 
   /// Store orders whose coins or diamonds have already been credited.
   final List<String> delivered;
@@ -37,10 +41,10 @@ class SaveData {
   /// What the player has once this cloud save reaches a device holding
   /// [local].
   ///
-  /// Coins, diamonds, credited orders and the equipped bike follow the
-  /// cloud. Bikes, tracks, upgrades, the best score and the last daily
-  /// claim only ever move forward, so the device never gives them up: a
-  /// purchase can't be undone by an update that arrives late or out of
+  /// Coins, diamonds, credited orders, the equipped bike and the avatar
+  /// follow the cloud. Bikes, tracks, upgrades, the best score and the last
+  /// daily claim only ever move forward, so the device never gives them up:
+  /// a purchase can't be undone by an update that arrives late or out of
   /// date.
   ///
   /// With [guest], [local] is progress made before signing in, so its
@@ -59,6 +63,7 @@ class SaveData {
       dailyClaim:
           _isLater(local.dailyClaim, dailyClaim) ? local.dailyClaim : dailyClaim,
       tracks: {...tracks, ...local.tracks},
+      avatar: avatar ?? local.avatar,
     );
   }
 
@@ -76,6 +81,7 @@ class SaveData {
         ],
         dailyClaim: _isLater(dailyClaim, base.dailyClaim) ? dailyClaim : null,
         tracks: tracks.difference(base.tracks),
+        avatar: avatar != base.avatar ? avatar : null,
       );
 
   /// Whether day [a] comes after day [b]. A missing day is before any other.
@@ -90,6 +96,7 @@ class SaveData {
       other.best == best &&
       other.doubleCoins == doubleCoins &&
       other.selected == selected &&
+      other.avatar == avatar &&
       other.dailyClaim == dailyClaim &&
       setEquals(other.owned, owned) &&
       listEquals(other.delivered, delivered) &&
@@ -97,7 +104,7 @@ class SaveData {
 
   @override
   int get hashCode => Object.hash(wallet, diamonds, best, doubleCoins, selected,
-      dailyClaim, owned.length, delivered.length, tracks.length);
+      avatar, dailyClaim, owned.length, delivered.length, tracks.length);
 }
 
 /// A change to a save, described so that two devices can both send theirs
@@ -115,6 +122,7 @@ class SaveDelta {
     this.orders = const [],
     this.dailyClaim,
     this.tracks = const {},
+    this.avatar,
   });
 
   final int coins;
@@ -137,6 +145,9 @@ class SaveDelta {
   /// Newly unlocked tracks.
   final Set<String> tracks;
 
+  /// The newly picked avatar, or null if it did not change.
+  final String? avatar;
+
   bool get isEmpty =>
       coins == 0 &&
       diamonds == 0 &&
@@ -146,5 +157,6 @@ class SaveDelta {
       selected == null &&
       orders.isEmpty &&
       dailyClaim == null &&
-      tracks.isEmpty;
+      tracks.isEmpty &&
+      avatar == null;
 }

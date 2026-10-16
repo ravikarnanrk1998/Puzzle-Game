@@ -255,8 +255,16 @@ class GamePainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(r - 9, -30, 4, h), edge);
 
     final dash = _fill(const Color(0xE6FFFFFF));
+    const middle = BikeGame.laneCount ~/ 2;
     for (var i = 1; i < BikeGame.laneCount; i++) {
       final x = l + BikeGame.laneWidth * i;
+      if (i == middle && g.track.traffic == TrafficFlow.twoWay) {
+        // A solid double yellow line between the two directions.
+        final yellow = _fill(const Color(0xFFFFC400));
+        canvas.drawRect(Rect.fromLTWH(x - 6, -30, 4, h), yellow);
+        canvas.drawRect(Rect.fromLTWH(x + 2, -30, 4, h), yellow);
+        continue;
+      }
       for (var y = dashStart; y < g.viewHeight + 30; y += 80) {
         canvas.drawRRect(
           RRect.fromRectAndRadius(
@@ -419,6 +427,8 @@ class GamePainter extends CustomPainter {
       ),
       _fill(const Color(0x44000000)),
     );
+    // Turned round after the shadow, which falls the same way for all.
+    if (v.oncoming) canvas.rotate(pi);
     if (v.kind == VehicleKind.truck) {
       _drawTruck(canvas, v, w, h);
     } else {
