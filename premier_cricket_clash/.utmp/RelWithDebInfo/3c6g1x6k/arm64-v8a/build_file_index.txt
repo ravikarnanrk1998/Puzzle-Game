@@ -1,0 +1,2 @@
+C:\Users\ravik\flutter soures\Puzzle-Game\premier_cricket_clash\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\CMakeLists.txt
+C:\Users\ravik\flutter soures\Puzzle-Game\premier_cricket_clash\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\GameActivity\CMakeLists.txt

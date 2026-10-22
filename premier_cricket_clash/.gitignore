@@ -1,0 +1,30 @@
+# Unity
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+*.csproj
+*.sln
+*.suo
+*.user
+*.pidb
+*.booproj
+.vs/
+.idea/
+*.apk
+*.aab
+crashlytics-build.properties
+
+# Signing (never commit - back it up somewhere safe instead)
+/Signing/
+*.keystore
+*.jks
+
+# .NET tests
+Tools/CoreTests/bin/
+Tools/CoreTests/obj/
+!Tools/CoreTests/CoreTests.csproj

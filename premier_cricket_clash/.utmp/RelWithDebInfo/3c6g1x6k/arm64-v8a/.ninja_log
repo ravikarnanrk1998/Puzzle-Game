@@ -1,0 +1,21 @@
+# ninja log v5
+13	2675	8142970409691759	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	63a6ea0a4b077662
+125	1025	8141004729203482	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	b823b117a688504d
+21	2266	8142970405596950	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	dd9b34c899a31a0
+58	2222	8142970405195328	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	2d8af8d43df43083
+1029	1447	8141004733064333	C:/Users/ravik/flutter soures/Puzzle-Game/premier_cricket_clash/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/3c6g1x6k/obj/arm64-v8a/libswappywrapper.so	1a4218cffc22993c
+69	2136	8142970404298997	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	b690be3065fca296
+31	2170	8142970404678868	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	8836d91e13d88704
+93	2475	8142970407651164	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	152a860fa893b1e3
+43	2197	8142970404906177	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	b104e810d46f8b1a
+81	2518	8142970408109831	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	29fe3a5284cbaa0c
+2676	2952	8142970412525661	C:/Users/ravik/flutter soures/Puzzle-Game/premier_cricket_clash/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/3c6g1x6k/obj/arm64-v8a/libgame.so	64043a8f26dc51c2
+104	1896	8142972324706228	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	b690be3065fca296
+75	1900	8142972324706228	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	8836d91e13d88704
+61	1904	8142972324782338	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	b104e810d46f8b1a
+116	1930	8142972325077690	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	2d8af8d43df43083
+29	1963	8142972325443699	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	dd9b34c899a31a0
+128	2018	8142972325971506	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	152a860fa893b1e3
+91	2203	8142972327815558	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	29fe3a5284cbaa0c
+13	2352	8142972329302692	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	63a6ea0a4b077662
+2352	2526	8142972331099775	C:/Users/ravik/flutter soures/Puzzle-Game/premier_cricket_clash/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/3c6g1x6k/obj/arm64-v8a/libgame.so	64043a8f26dc51c2

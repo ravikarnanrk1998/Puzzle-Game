@@ -1,0 +1,61 @@
+PREMIER CRICKET CLASH 2027 - GOOGLE PLAY STORE LISTING
+(copy each part into Play Console > Grow users > Store presence > Main store listing)
+
+APP NAME (max 30 characters)
+Premier Cricket Clash 2027
+
+SHORT DESCRIPTION (max 80 characters)
+3D T20 cricket: swipe to bat, pick your length to bowl, run a mega auction!
+
+FULL DESCRIPTION (max 4000 characters)
+Step into the floodlights of the Premier Cricket Clash - a fast, fully 3D T20 cricket game built for your phone.
+
+🏏 BAT YOUR WAY
+• Two control styles - pick in Settings:
+  - SWIPE: swipe in the direction you want to hit, tap to defend, LOFT for big shots.
+  - BUTTONS: aim with the joystick and press DEFEND, GROUND or LOFT at the perfect moment.
+• A pitch marker shows the length as the bowler runs in - yorker, full, good, short or bouncer.
+• A timing ring and PERFECT / GOOD / EARLY / LATE feedback on every shot.
+• TV-style broadcast camera from behind the bowler, with a follow-cam that chases every boundary.
+
+🎯 BOWL WITH CONTROL
+• Choose stock balls, slower balls, in-swingers, out-swingers, quicker balls and mystery spin.
+• Drag the target on a colour-coded pitch map, then stop the meter for accuracy.
+• See exactly where the ball landed and your accuracy score after every delivery.
+• Pick your bowler for every over and manage four-over quotas.
+
+💰 MEGA AUCTION
+• Take charge of one of 10 franchises with a ₹120 Cr purse.
+• Retain up to 6 stars - every unused slot becomes a Right-to-Match card.
+• Bid live against 9 AI franchises that value players by squad need and budget.
+• Marquee sets, capped and uncapped sets, RTM drama and an accelerated round.
+• Then take your new squad into quick matches.
+
+🏟️ STADIUM ATMOSPHERE
+• Day games under the sun or night games under the floodlights.
+• Packed crowds in team colours, LED boards, big screens and waving flags.
+• Full scorecards, partnerships, fall of wickets and Player of the Match.
+
+⚡ PLAY YOUR WAY
+• 2, 5, 10 or 20-over matches.
+• Easy, Normal and Hard difficulty.
+• Pause at any time - or simulate an over, an innings or the whole match.
+• Plays completely offline. No ads. No in-app purchases.
+
+Premier Cricket Clash is an unofficial fan-made game. Franchises, venues, kits and logos are original creations. The game is not affiliated with, endorsed by, or connected to any real cricket league, board, team or player.
+
+CATEGORY
+Game > Sports
+
+TAGS (choose up to 5 in Play Console)
+Cricket, Sports, Simulation, Offline, Casual
+
+CONTACT DETAILS
+Email: (your support email - required)
+Website: (optional)
+Privacy policy URL: (where you host privacy-policy.html - see PUBLISHING-GUIDE.txt)
+
+GRAPHICS IN THIS FOLDER
+• App icon: icon-512.png (512 x 512)
+• Feature graphic: feature-graphic-1024x500.png (1024 x 500)
+• Phone screenshots: screenshots\1_main_menu.png ... 8_quick_match.png (2160 x 1080, landscape)

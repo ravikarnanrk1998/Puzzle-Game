@@ -1,0 +1,50 @@
+name: kpl
+description: "IPL 2027 - Mega Auction, Mini Auction and full T20 season cricket game."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.5.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # GPU fragment shader for the stadium ground (grass, pitch, creases, lights).
+  shaders:
+    - shaders/ground.frag
+
+  # Teko (display / scoreboard numerals) and Rajdhani (UI) - both SIL Open Font
+  # License, downloaded from Google Fonts.
+  fonts:
+    - family: Teko
+      fonts:
+        - asset: assets/fonts/Teko-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Teko-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Teko-Bold.ttf
+          weight: 700
+    - family: Rajdhani
+      fonts:
+        - asset: assets/fonts/Rajdhani-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Rajdhani-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Rajdhani-Bold.ttf
+          weight: 700

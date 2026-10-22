@@ -1,0 +1,444 @@
+import '../models/player.dart';
+
+/// Player database.
+///
+/// Squads: IPL 2026 retention lists (15 Nov 2025) + IPL 2026 auction buys
+/// (Abu Dhabi, 16 Dec 2025) with real salaries in lakh. Pool: notable players
+/// outside the 2026 squads (unsold / released / in-season replacements) with
+/// their auction base price. Ratings (bat / bowl / power) are game ratings.
+///
+/// Format: name|country|role|batHand|bowlStyle|bat|bowl|power|capped|team2026|lakh
+const _raw = <String>[
+  // ---------------------------------------------------------------- CSK
+  'Ruturaj Gaikwad|IND|BAT|R|-|86|5|72|C|CSK|1800',
+  'Sanju Samson|IND|WK|R|-|87|5|86|C|CSK|1800',
+  'Shivam Dube|IND|AR|L|RM|83|55|90|C|CSK|1200',
+  'Noor Ahmad|AFG|BOWL|R|LWS|18|86|30|C|CSK|1000',
+  'Khaleel Ahmed|IND|BOWL|R|LFM|12|79|25|C|CSK|480',
+  'MS Dhoni|IND|WK|R|-|74|0|84|U|CSK|400',
+  'Anshul Kamboj|IND|BOWL|R|RFM|38|76|45|C|CSK|340',
+  'Dewald Brevis|SA|BAT|R|LB|82|25|91|C|CSK|220',
+  'Gurjapneet Singh|IND|BOWL|R|LFM|10|70|20|U|CSK|220',
+  'Nathan Ellis|AUS|BOWL|R|RFM|28|80|40|C|CSK|200',
+  'Jamie Overton|ENG|AR|R|RF|62|74|80|C|CSK|150',
+  'Mukesh Choudhary|IND|BOWL|L|LFM|10|68|20|U|CSK|30',
+  'Ramakrishna Ghosh|IND|AR|R|RFM|55|62|60|U|CSK|30',
+  'Shreyas Gopal|IND|AR|R|LB|45|68|45|U|CSK|30',
+  'Ayush Mhatre|IND|BAT|R|OB|77|25|86|U|CSK|30',
+  'Urvil Patel|IND|WK|R|-|72|0|92|U|CSK|30',
+  'Sarfaraz Khan|IND|BAT|R|-|76|0|76|C|CSK|75',
+  'Matt Henry|NZ|BOWL|R|RFM|30|81|40|C|CSK|200',
+  'Rahul Chahar|IND|BOWL|R|LB|25|76|30|C|CSK|520',
+  'Akeal Hosein|WI|BOWL|L|SLA|35|80|50|C|CSK|200',
+  'Prashant Veer|IND|AR|L|SLA|70|70|82|U|CSK|1420',
+  'Kartik Sharma|IND|WK|R|-|73|0|90|U|CSK|1420',
+  'Zak Foulkes|NZ|AR|R|RFM|50|70|55|C|CSK|75',
+  'Matthew Short|AUS|AR|R|OB|76|55|86|C|CSK|150',
+  'Aman Khan|IND|AR|R|RM|60|45|84|U|CSK|40',
+  // ----------------------------------------------------------------- DC
+  'Axar Patel|IND|AR|L|SLA|77|84|80|C|DC|1650',
+  'KL Rahul|IND|WK|R|-|87|0|74|C|DC|1400',
+  'Kuldeep Yadav|IND|BOWL|L|LWS|20|88|25|C|DC|1325',
+  'Mitchell Starc|AUS|BOWL|L|LF|35|86|50|C|DC|1175',
+  'T Natarajan|IND|BOWL|L|LFM|8|77|15|C|DC|1075',
+  'Tristan Stubbs|SA|WK|R|OB|81|25|88|C|DC|1000',
+  'Mukesh Kumar|IND|BOWL|R|RFM|10|75|20|C|DC|800',
+  'Nitish Rana|IND|BAT|L|OB|75|40|82|C|DC|420',
+  'Abishek Porel|IND|WK|L|-|74|0|85|U|DC|400',
+  'Ashutosh Sharma|IND|BAT|R|-|72|0|92|U|DC|380',
+  'Sameer Rizvi|IND|BAT|R|-|70|0|86|U|DC|95',
+  'Dushmantha Chameera|SL|BOWL|R|RF|25|76|40|C|DC|75',
+  'Karun Nair|IND|BAT|R|-|74|0|78|C|DC|50',
+  'Madhav Tiwari|IND|AR|R|RFM|50|58|62|U|DC|40',
+  'Ajay Mandal|IND|AR|L|SLA|45|60|50|U|DC|30',
+  'Tripurana Vijay|IND|AR|R|OB|40|60|45|U|DC|30',
+  'Vipraj Nigam|IND|AR|R|LB|58|70|86|U|DC|30',
+  'David Miller|SA|BAT|L|-|81|0|86|C|DC|200',
+  'Prithvi Shaw|IND|BAT|R|-|72|0|89|C|DC|75',
+  'Ben Duckett|ENG|WK|L|-|80|0|86|C|DC|200',
+  'Auqib Nabi|IND|AR|R|RFM|45|74|50|U|DC|840',
+  'Pathum Nissanka|SL|BAT|R|-|81|0|80|C|DC|400',
+  'Kyle Jamieson|NZ|BOWL|R|RF|50|77|65|C|DC|200',
+  'Lungi Ngidi|SA|BOWL|R|RF|15|79|25|C|DC|200',
+  'Sahil Parekh|IND|BAT|L|-|62|0|72|U|DC|30',
+  // ----------------------------------------------------------------- GT
+  'Rashid Khan|AFG|BOWL|R|LB|62|90|88|C|GT|1800',
+  'Shubman Gill|IND|BAT|R|-|90|0|78|C|GT|1650',
+  'Jos Buttler|ENG|WK|R|-|89|0|88|C|GT|1575',
+  'Mohammed Siraj|IND|BOWL|R|RF|10|82|20|C|GT|1225',
+  'Kagiso Rabada|SA|BOWL|L|RF|30|88|40|C|GT|1075',
+  'Prasidh Krishna|IND|BOWL|R|RF|8|83|15|C|GT|950',
+  'Sai Sudharsan|IND|BAT|L|-|88|0|78|C|GT|850',
+  'Rahul Tewatia|IND|AR|L|LB|70|45|86|U|GT|400',
+  'Shahrukh Khan|IND|BAT|R|OB|70|25|88|U|GT|400',
+  'Washington Sundar|IND|AR|L|OB|70|77|74|C|GT|320',
+  'Sai Kishore|IND|BOWL|L|SLA|30|78|40|C|GT|200',
+  'Glenn Phillips|NZ|BAT|R|OB|79|45|88|C|GT|200',
+  'Arshad Khan|IND|AR|L|LFM|55|62|78|U|GT|130',
+  'Gurnoor Brar|IND|BOWL|R|RFM|15|65|25|U|GT|130',
+  'Ishant Sharma|IND|BOWL|R|RFM|10|70|15|C|GT|75',
+  'Jayant Yadav|IND|AR|R|OB|45|64|45|C|GT|75',
+  'Kumar Kushagra|IND|WK|R|-|62|0|75|U|GT|65',
+  'Anuj Rawat|IND|WK|L|-|64|0|78|U|GT|30',
+  'Manav Suthar|IND|BOWL|L|SLA|20|66|25|U|GT|30',
+  'Nishant Sindhu|IND|AR|L|SLA|58|58|65|U|GT|30',
+  'Ashok Sharma|IND|BOWL|R|RFM|10|64|20|U|GT|90',
+  'Jason Holder|WI|AR|R|RFM|65|78|78|C|GT|700',
+  'Tom Banton|ENG|WK|R|-|76|0|88|C|GT|200',
+  'Prithvi Raj Yarra|IND|BOWL|L|LFM|10|62|20|U|GT|30',
+  'Luke Wood|ENG|BOWL|L|LFM|20|72|35|C|GT|75',
+  // ---------------------------------------------------------------- KKR
+  'Rinku Singh|IND|BAT|L|-|80|0|86|C|KKR|1300',
+  'Sunil Narine|WI|AR|L|OB|76|86|94|C|KKR|1200',
+  'Varun Chakravarthy|IND|BOWL|R|LB|8|88|10|C|KKR|1200',
+  'Harshit Rana|IND|BOWL|R|RF|40|76|60|C|KKR|400',
+  'Ramandeep Singh|IND|AR|R|RM|65|52|90|C|KKR|400',
+  'Angkrish Raghuvanshi|IND|BAT|R|-|72|0|80|U|KKR|300',
+  'Vaibhav Arora|IND|BOWL|R|RFM|10|72|20|U|KKR|180',
+  'Ajinkya Rahane|IND|BAT|R|-|76|0|78|C|KKR|150',
+  'Rovman Powell|WI|BAT|R|RM|75|30|90|C|KKR|150',
+  'Manish Pandey|IND|BAT|R|-|70|0|74|C|KKR|75',
+  'Umran Malik|IND|BOWL|R|RF|10|70|20|C|KKR|75',
+  'Anukul Roy|IND|AR|L|SLA|50|62|60|U|KKR|40',
+  'Cameron Green|AUS|AR|R|RFM|82|72|84|C|KKR|2520',
+  'Rachin Ravindra|NZ|AR|L|SLA|79|55|80|C|KKR|200',
+  'Finn Allen|NZ|WK|R|-|78|0|94|C|KKR|200',
+  'Akash Deep|IND|BOWL|R|RFM|20|72|30|C|KKR|100',
+  'Matheesha Pathirana|SL|BOWL|R|RF|5|82|10|C|KKR|1800',
+  'Tejasvi Singh|IND|WK|R|-|66|0|88|U|KKR|300',
+  'Kartik Tyagi|IND|BOWL|R|RF|10|66|20|U|KKR|30',
+  'Prashant Solanki|IND|BOWL|R|LB|15|62|20|U|KKR|30',
+  'Rahul Tripathi|IND|BAT|R|-|72|0|80|C|KKR|75',
+  'Tim Seifert|NZ|WK|R|-|74|0|86|C|KKR|150',
+  'Blessing Muzarabani|ZIM|BOWL|R|RF|15|74|25|C|KKR|75',
+  'Sarthak Ranjan|IND|BAT|R|-|60|0|72|U|KKR|30',
+  'Daksh Kamra|IND|AR|R|OB|50|55|60|U|KKR|30',
+  // ---------------------------------------------------------------- LSG
+  'Rishabh Pant|IND|WK|L|-|85|0|90|C|LSG|2700',
+  'Nicholas Pooran|WI|WK|L|-|87|0|95|C|LSG|2100',
+  'Mayank Yadav|IND|BOWL|R|RF|10|76|20|C|LSG|1100',
+  'Mohammed Shami|IND|BOWL|R|RF|15|80|25|C|LSG|1000',
+  'Avesh Khan|IND|BOWL|R|RFM|15|76|30|C|LSG|975',
+  'Abdul Samad|IND|BAT|R|LB|70|30|91|U|LSG|420',
+  'Ayush Badoni|IND|BAT|R|OB|72|30|82|U|LSG|400',
+  'Mohsin Khan|IND|BOWL|L|LFM|10|73|20|U|LSG|400',
+  'Mitchell Marsh|AUS|AR|R|RM|84|50|88|C|LSG|340',
+  'Shahbaz Ahmed|IND|AR|L|SLA|58|64|65|C|LSG|240',
+  'Aiden Markram|SA|BAT|R|OB|82|50|80|C|LSG|200',
+  'Manimaran Siddharth|IND|BOWL|R|SLA|10|66|15|U|LSG|75',
+  'Matthew Breetzke|SA|BAT|R|-|76|0|82|C|LSG|75',
+  'Akash Singh|IND|BOWL|R|LFM|10|64|20|U|LSG|30',
+  'Arjun Tendulkar|IND|AR|L|LFM|40|62|55|U|LSG|30',
+  'Arshin Kulkarni|IND|AR|R|RM|58|50|72|U|LSG|30',
+  'Himmat Singh|IND|BAT|R|-|62|0|75|U|LSG|30',
+  'Digvesh Rathi|IND|BOWL|R|LB|10|74|15|U|LSG|30',
+  'Prince Yadav|IND|BOWL|R|RFM|10|66|20|U|LSG|30',
+  'Wanindu Hasaranga|SL|AR|R|LB|55|85|85|C|LSG|200',
+  'Anrich Nortje|SA|BOWL|R|RF|10|78|20|C|LSG|200',
+  'Mukul Choudhary|IND|WK|R|-|62|0|80|U|LSG|260',
+  'Naman Tiwari|IND|BOWL|L|LFM|10|62|20|U|LSG|100',
+  'Josh Inglis|AUS|WK|R|-|80|0|88|C|LSG|860',
+  'Akshat Raghuwanshi|IND|BAT|R|-|64|0|76|U|LSG|220',
+  // ----------------------------------------------------------------- MI
+  'Jasprit Bumrah|IND|BOWL|R|RF|10|97|15|C|MI|1800',
+  'Hardik Pandya|IND|AR|R|RFM|82|79|90|C|MI|1635',
+  'Suryakumar Yadav|IND|BAT|R|-|90|0|93|C|MI|1635',
+  'Rohit Sharma|IND|BAT|R|-|84|0|88|C|MI|1630',
+  'Trent Boult|NZ|BOWL|R|LFM|15|85|25|C|MI|1250',
+  'Deepak Chahar|IND|BOWL|R|RM|40|76|55|C|MI|925',
+  'Tilak Varma|IND|BAT|L|OB|85|30|84|C|MI|800',
+  'Will Jacks|ENG|AR|R|OB|79|62|88|C|MI|525',
+  'Naman Dhir|IND|AR|R|OB|70|45|86|U|MI|525',
+  'Allah Ghazanfar|AFG|BOWL|R|OB|10|76|15|C|MI|480',
+  'Sherfane Rutherford|WI|BAT|L|RM|74|30|90|C|MI|260',
+  'Shardul Thakur|IND|AR|R|RFM|55|70|86|C|MI|200',
+  'Mitchell Santner|NZ|AR|L|SLA|55|80|70|C|MI|200',
+  'Ryan Rickelton|SA|WK|L|-|79|0|86|C|MI|100',
+  'Corbin Bosch|SA|AR|R|RFM|58|68|72|C|MI|75',
+  'Robin Minz|IND|WK|L|-|62|0|82|U|MI|65',
+  'Raj Angad Bawa|IND|AR|L|RM|52|52|65|U|MI|30',
+  'Ashwani Kumar|IND|BOWL|L|LFM|10|68|20|U|MI|30',
+  'Raghu Sharma|IND|BOWL|R|LB|10|62|15|U|MI|30',
+  'Mayank Markande|IND|BOWL|R|LB|15|66|20|C|MI|30',
+  'Quinton de Kock|SA|WK|L|-|80|0|86|C|MI|100',
+  'Danish Malewar|IND|BAT|R|-|64|0|72|U|MI|30',
+  'Mayank Rawat|IND|AR|R|OB|52|50|65|U|MI|30',
+  'Mohammad Izhar|IND|BOWL|R|RFM|10|60|20|U|MI|30',
+  'Atharva Ankolekar|IND|AR|L|SLA|52|58|60|U|MI|30',
+  // --------------------------------------------------------------- PBKS
+  'Shreyas Iyer|IND|BAT|R|-|88|0|86|C|PBKS|2675',
+  'Arshdeep Singh|IND|BOWL|L|LFM|15|86|25|C|PBKS|1800',
+  'Yuzvendra Chahal|IND|BOWL|R|LB|5|84|5|C|PBKS|1800',
+  'Marcus Stoinis|AUS|AR|R|RM|79|58|88|C|PBKS|1100',
+  'Marco Jansen|SA|AR|R|LF|66|80|82|C|PBKS|700',
+  'Shashank Singh|IND|BAT|R|-|76|0|90|U|PBKS|550',
+  'Nehal Wadhera|IND|BAT|L|LB|72|25|82|U|PBKS|420',
+  'Prabhsimran Singh|IND|WK|R|-|78|0|88|U|PBKS|400',
+  'Priyansh Arya|IND|BAT|L|-|76|0|92|U|PBKS|380',
+  'Mitchell Owen|AUS|AR|R|RM|72|50|92|C|PBKS|300',
+  'Azmatullah Omarzai|AFG|AR|R|RFM|68|74|82|C|PBKS|240',
+  'Lockie Ferguson|NZ|BOWL|R|RF|10|78|20|C|PBKS|200',
+  'Vijaykumar Vyshak|IND|BOWL|R|RFM|10|68|20|U|PBKS|180',
+  'Yash Thakur|IND|BOWL|R|RFM|10|68|20|U|PBKS|160',
+  'Harpreet Brar|IND|AR|L|SLA|45|70|60|U|PBKS|150',
+  'Vishnu Vinod|IND|WK|R|-|62|0|80|U|PBKS|95',
+  'Xavier Bartlett|AUS|BOWL|R|RFM|25|74|45|C|PBKS|80',
+  'Pyla Avinash|IND|BAT|R|-|58|0|78|U|PBKS|30',
+  'Harnoor Pannu|IND|BAT|L|-|60|0|70|U|PBKS|30',
+  'Musheer Khan|IND|AR|R|SLA|62|55|65|U|PBKS|30',
+  'Suryansh Shedge|IND|AR|R|RM|60|50|80|U|PBKS|30',
+  'Ben Dwarshuis|AUS|AR|L|LFM|55|74|70|C|PBKS|440',
+  'Praveen Dubey|IND|BOWL|R|LB|20|62|30|U|PBKS|30',
+  'Cooper Connolly|AUS|AR|L|SLA|72|60|82|C|PBKS|300',
+  'Vishal Nishad|IND|AR|R|LB|45|55|50|U|PBKS|30',
+  // ----------------------------------------------------------------- RR
+  'Yashasvi Jaiswal|IND|BAT|L|LB|89|20|90|C|RR|1800',
+  'Riyan Parag|IND|AR|R|LB|80|50|88|C|RR|1400',
+  'Ravindra Jadeja|IND|AR|L|SLA|74|80|76|C|RR|1400',
+  'Dhruv Jurel|IND|WK|R|-|76|0|84|C|RR|1400',
+  'Jofra Archer|ENG|BOWL|R|RF|40|86|65|C|RR|1250',
+  'Shimron Hetmyer|WI|BAT|L|-|77|0|90|C|RR|1100',
+  'Tushar Deshpande|IND|BOWL|R|RFM|10|72|20|C|RR|650',
+  'Sandeep Sharma|IND|BOWL|R|RM|10|76|15|C|RR|400',
+  'Nandre Burger|SA|BOWL|R|LF|10|74|20|C|RR|350',
+  'Sam Curran|ENG|AR|L|LFM|70|76|80|C|RR|240',
+  'Kwena Maphaka|SA|BOWL|L|LF|10|70|20|C|RR|150',
+  'Vaibhav Sooryavanshi|IND|BAT|L|-|88|0|98|U|RR|110',
+  'Donovan Ferreira|SA|BAT|R|OB|70|35|90|C|RR|100',
+  'Shubham Dubey|IND|BAT|L|-|64|0|86|U|RR|80',
+  'Yudhvir Singh|IND|BOWL|R|RFM|30|64|50|U|RR|35',
+  'Lhuan-dre Pretorius|SA|WK|L|-|70|0|86|C|RR|30',
+  'Ravi Bishnoi|IND|BOWL|R|LB|10|80|15|C|RR|720',
+  'Sushant Mishra|IND|BOWL|L|LFM|10|64|20|U|RR|90',
+  'Yash Raj Punja|IND|BOWL|R|LB|10|58|15|U|RR|30',
+  'Vignesh Puthur|IND|BOWL|R|LWS|10|64|15|U|RR|30',
+  'Adam Milne|NZ|BOWL|R|RF|20|73|35|C|RR|240',
+  'Kuldeep Sen|IND|BOWL|R|RF|10|66|20|C|RR|75',
+  'Aman Rao|IND|BAT|R|-|60|0|72|U|RR|30',
+  'Ravi Singh|IND|WK|R|-|62|0|80|U|RR|95',
+  'Brijesh Sharma|IND|BOWL|R|RFM|10|58|20|U|RR|30',
+  // ---------------------------------------------------------------- RCB
+  'Virat Kohli|IND|BAT|R|-|93|0|80|C|RCB|2100',
+  'Josh Hazlewood|AUS|BOWL|L|RFM|15|88|20|C|RCB|1250',
+  'Phil Salt|ENG|WK|R|-|85|0|93|C|RCB|1150',
+  'Rajat Patidar|IND|BAT|R|-|81|0|88|C|RCB|1100',
+  'Jitesh Sharma|IND|WK|R|-|74|0|90|C|RCB|1100',
+  'Bhuvneshwar Kumar|IND|BOWL|R|RM|30|82|40|C|RCB|1075',
+  'Rasikh Salam|IND|BOWL|R|RFM|10|68|25|U|RCB|600',
+  'Krunal Pandya|IND|AR|L|SLA|68|78|78|C|RCB|575',
+  'Yash Dayal|IND|BOWL|L|LFM|10|72|20|U|RCB|500',
+  'Tim David|AUS|BAT|R|OB|78|25|94|C|RCB|300',
+  'Suyash Sharma|IND|BOWL|R|LB|5|74|5|U|RCB|260',
+  'Jacob Bethell|ENG|AR|L|SLA|76|55|84|C|RCB|260',
+  'Devdutt Padikkal|IND|BAT|L|-|76|0|80|C|RCB|200',
+  'Nuwan Thushara|SL|BOWL|R|RFM|5|74|5|C|RCB|160',
+  'Romario Shepherd|WI|AR|R|RFM|66|70|92|C|RCB|150',
+  'Swapnil Singh|IND|AR|R|SLA|45|62|55|U|RCB|50',
+  'Abhinandan Singh|IND|BOWL|R|RFM|10|62|20|U|RCB|30',
+  'Venkatesh Iyer|IND|AR|L|RM|77|35|86|C|RCB|700',
+  'Jacob Duffy|NZ|BOWL|R|RFM|20|76|30|C|RCB|200',
+  'Jordan Cox|ENG|WK|R|-|72|0|86|C|RCB|75',
+  'Satvik Deswal|IND|AR|R|RM|50|52|60|U|RCB|30',
+  'Vicky Ostwal|IND|BOWL|R|SLA|30|62|40|U|RCB|30',
+  'Mangesh Yadav|IND|AR|L|LFM|55|66|70|U|RCB|520',
+  'Vihaan Malhotra|IND|BAT|R|OB|60|35|72|U|RCB|30',
+  'Kanishk Chouhan|IND|AR|R|OB|52|58|60|U|RCB|30',
+  // ---------------------------------------------------------------- SRH
+  'Heinrich Klaasen|SA|WK|R|-|90|0|94|C|SRH|2300',
+  'Pat Cummins|AUS|BOWL|R|RF|55|85|85|C|SRH|1800',
+  'Travis Head|AUS|BAT|L|OB|88|35|95|C|SRH|1400',
+  'Abhishek Sharma|IND|AR|L|SLA|88|55|98|C|SRH|1400',
+  'Ishan Kishan|IND|WK|L|-|81|0|90|C|SRH|1125',
+  'Harshal Patel|IND|BOWL|R|RM|30|80|50|C|SRH|800',
+  'Nitish Kumar Reddy|IND|AR|R|RM|72|58|82|C|SRH|600',
+  'Eshan Malinga|SL|BOWL|R|RFM|10|70|15|C|SRH|120',
+  'Brydon Carse|ENG|BOWL|R|RF|30|74|50|C|SRH|100',
+  'Jaydev Unadkat|IND|BOWL|R|LM|15|70|20|C|SRH|100',
+  'Kamindu Mendis|SL|AR|L|OB|72|55|80|C|SRH|75',
+  'Zeeshan Ansari|IND|BOWL|R|LB|15|70|20|U|SRH|40',
+  'Smaran Ravichandran|IND|BAT|L|-|66|0|78|U|SRH|30',
+  'Aniket Verma|IND|BAT|R|-|68|0|92|U|SRH|30',
+  'Harsh Dubey|IND|AR|L|SLA|50|64|60|U|SRH|30',
+  'Liam Livingstone|ENG|AR|R|LB|80|55|93|C|SRH|1300',
+  'Shivam Mavi|IND|BOWL|R|RFM|30|66|50|C|SRH|75',
+  'Shivang Kumar|IND|AR|L|LWS|50|55|60|U|SRH|30',
+  'Salil Arora|IND|WK|R|-|62|0|85|U|SRH|150',
+  'Sakib Hussain|IND|BOWL|R|RF|10|62|20|U|SRH|30',
+  'Onkar Tarmale|IND|BOWL|R|RFM|10|60|20|U|SRH|30',
+  'Amit Kumar|IND|BOWL|R|LB|10|58|15|U|SRH|30',
+  'Praful Hinge|IND|BOWL|R|RFM|10|68|20|U|SRH|30',
+  'Krains Fuletra|IND|AR|L|SLA|45|58|55|U|SRH|30',
+  'Jack Edwards|AUS|AR|R|RFM|64|66|78|C|SRH|300',
+  // -------------------------------------------- AUCTION POOL (no 2026 club)
+  'Jonny Bairstow|ENG|WK|R|-|80|0|88|C|-|200',
+  'Devon Conway|NZ|WK|L|-|81|0|78|C|-|200',
+  'Daryl Mitchell|NZ|BAT|R|RM|81|40|82|C|-|200',
+  'Jake Fraser-McGurk|AUS|BAT|R|LB|74|20|96|C|-|200',
+  'Glenn Maxwell|AUS|AR|R|OB|74|64|92|C|-|200',
+  'Rahmanullah Gurbaz|AFG|WK|R|-|76|0|88|C|-|150',
+  'Alzarri Joseph|WI|BOWL|R|RF|30|75|50|C|-|200',
+  'Gus Atkinson|ENG|BOWL|R|RF|35|74|50|C|-|200',
+  'Adam Zampa|AUS|BOWL|R|LB|10|78|15|C|-|200',
+  'Maheesh Theekshana|SL|BOWL|R|OB|15|77|20|C|-|200',
+  'Mujeeb Ur Rahman|AFG|BOWL|R|OB|15|74|20|C|-|150',
+  'Fazalhaq Farooqi|AFG|BOWL|R|LFM|5|74|10|C|-|150',
+  'Keshav Maharaj|SA|BOWL|R|SLA|30|76|35|C|-|75',
+  'Gerald Coetzee|SA|BOWL|R|RF|35|73|60|C|-|150',
+  'Spencer Johnson|AUS|BOWL|L|LF|15|72|30|C|-|150',
+  'Dasun Shanaka|SL|AR|R|RM|66|58|86|C|-|75',
+  'George Linde|SA|AR|L|SLA|55|68|70|C|-|100',
+  'Rehan Ahmed|ENG|AR|R|LB|55|66|72|C|-|75',
+  'Richard Gleeson|ENG|BOWL|R|RF|15|70|20|C|-|100',
+  'Dilshan Madushanka|SL|BOWL|R|LFM|10|70|20|C|-|75',
+  'Shamar Joseph|WI|BOWL|R|RF|20|70|40|C|-|100',
+  'Naveen-ul-Haq|AFG|BOWL|R|RFM|15|72|25|C|-|150',
+  'Kusal Mendis|SL|WK|R|-|76|0|84|C|-|100',
+  'Wiaan Mulder|SA|AR|R|RFM|66|62|72|C|-|100',
+  'Sediqullah Atal|AFG|BAT|L|-|70|0|82|C|-|75',
+  'Connor Esterhuizen|SA|WK|R|-|66|0|80|C|-|75',
+  'Dian Forrester|SA|AR|L|RFM|62|56|78|C|-|75',
+  'Deepak Hooda|IND|AR|R|OB|66|45|80|C|-|75',
+  'Mayank Agarwal|IND|BAT|R|-|70|0|80|C|-|75',
+  'Navdeep Saini|IND|BOWL|R|RF|20|65|30|C|-|75',
+  'Karn Sharma|IND|BOWL|L|LB|30|64|40|C|-|50',
+  'Mahipal Lomror|IND|BAT|L|SLA|64|35|82|U|-|50',
+  'Akash Madhwal|IND|BOWL|R|RFM|10|66|20|U|-|30',
+  'Chetan Sakariya|IND|BOWL|L|LFM|10|64|20|C|-|75',
+  'Vijay Shankar|IND|AR|R|RM|62|45|72|C|-|75',
+];
+
+/// Jersey numbers that fans know; everyone else gets a stable generated one.
+const _knownNumbers = <String, int>{
+  'MS Dhoni': 7,
+  'Virat Kohli': 18,
+  'Rohit Sharma': 45,
+  'Jasprit Bumrah': 93,
+  'Hardik Pandya': 33,
+  'Ravindra Jadeja': 8,
+  'Suryakumar Yadav': 63,
+  'Shubman Gill': 77,
+  'Rishabh Pant': 17,
+  'KL Rahul': 1,
+  'Mohammed Shami': 11,
+  'Arshdeep Singh': 2,
+  'Yuzvendra Chahal': 3,
+  'Shreyas Iyer': 41,
+  'Kuldeep Yadav': 23,
+  'Axar Patel': 20,
+  'Yashasvi Jaiswal': 64,
+  'Rinku Singh': 35,
+  'Bhuvneshwar Kumar': 15,
+  'Mohammed Siraj': 73,
+  'Sunil Narine': 74,
+  'Rashid Khan': 19,
+  'Pat Cummins': 30,
+  'Mitchell Starc': 56,
+  'Jos Buttler': 63,
+  'Trent Boult': 18,
+  'Kagiso Rabada': 25,
+  'Nicholas Pooran': 29,
+  'Glenn Maxwell': 32,
+  'Quinton de Kock': 12,
+};
+
+int _stableHash(String s) {
+  var h = 7;
+  for (final c in s.codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  return h;
+}
+
+Role _role(String s) => switch (s) {
+      'BAT' => Role.bat,
+      'WK' => Role.wk,
+      'AR' => Role.ar,
+      _ => Role.bowl,
+    };
+
+BowlStyle _bowl(String s) => switch (s) {
+      'RF' => BowlStyle.rf,
+      'RFM' => BowlStyle.rfm,
+      'RM' => BowlStyle.rm,
+      'LF' => BowlStyle.lf,
+      'LFM' => BowlStyle.lfm,
+      'LM' => BowlStyle.lm,
+      'OB' => BowlStyle.ob,
+      'LB' => BowlStyle.lb,
+      'SLA' => BowlStyle.sla,
+      'LWS' => BowlStyle.lws,
+      _ => BowlStyle.none,
+    };
+
+/// A confirmed IPL 2027 trade (applied to pre-auction squads).
+class Trade {
+  const Trade(this.player, this.from, this.to, this.fee, this.date);
+  final String player;
+  final String from;
+  final String to;
+  final int fee;
+  final String date;
+}
+
+/// Confirmed IPL 2027 trade-window moves as of Oct 2026.
+const kTrades2027 = <Trade>[
+  Trade('Rishabh Pant', 'LSG', 'DC', 1500, '23 Jun 2026'),
+  Trade('Kuldeep Yadav', 'DC', 'LSG', 1325, '23 Jun 2026'),
+  Trade('T Natarajan', 'DC', 'SRH', 500, '14 Oct 2026'),
+  Trade('Zeeshan Ansari', 'SRH', 'DC', 40, '14 Oct 2026'),
+];
+
+/// Headlines for the menu news ticker.
+const kHeadlines = <String>[
+  'RCB win back-to-back titles - beat GT by 5 wickets in the IPL 2026 final',
+  'Vaibhav Sooryavanshi: Orange Cap, MVP & Emerging Player of IPL 2026 (776 runs)',
+  'Kagiso Rabada claims the IPL 2026 Purple Cap with 29 wickets',
+  'TRADE: Rishabh Pant returns to Delhi Capitals for ₹15 Cr, Kuldeep Yadav joins LSG',
+  'TRADE: T Natarajan back at SRH (₹5 Cr) as Zeeshan Ansari moves to DC',
+  'IPL 2027 auction heads to Goa in December • retention deadline expected 15 Nov',
+  'Record books: Cameron Green ₹25.20 Cr - costliest overseas buy in IPL history',
+];
+
+class PlayerDb {
+  PlayerDb._(this.all) : _byId = {for (final p in all) p.id: p};
+
+  static final PlayerDb instance = PlayerDb._(_parse());
+
+  final List<Player> all;
+  final Map<int, Player> _byId;
+
+  Player byId(int id) => _byId[id]!;
+  Player? byName(String name) {
+    for (final p in all) {
+      if (p.name == name) return p;
+    }
+    return null;
+  }
+
+  List<Player> squad2026(String teamId) =>
+      all.where((p) => p.team26 == teamId).toList();
+
+  static List<Player> _parse() {
+    final out = <Player>[];
+    for (var i = 0; i < _raw.length; i++) {
+      final f = _raw[i].split('|');
+      final name = f[0];
+      out.add(Player(
+        id: i + 1,
+        name: name,
+        country: f[1],
+        role: _role(f[2]),
+        leftBat: f[3] == 'L',
+        bowlStyle: _bowl(f[4]),
+        bat: int.parse(f[5]),
+        bowl: int.parse(f[6]),
+        power: int.parse(f[7]),
+        capped: f[8] == 'C',
+        team26: f[9] == '-' ? null : f[9],
+        price26: int.parse(f[10]),
+        jersey: _knownNumbers[name] ?? (_stableHash(name) % 98 + 1),
+      ));
+    }
+    return out;
+  }
+}

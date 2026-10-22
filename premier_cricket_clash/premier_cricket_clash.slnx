@@ -1,0 +1,6 @@
+﻿<Solution>
+  <Project Path="PCC.Editor.csproj" />
+  <Project Path="PCC.Game.csproj" />
+  <Project Path="PCC.Core.csproj" />
+  <Project Path="PCC.Bootstrap.csproj" />
+</Solution>

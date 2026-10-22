@@ -1,0 +1,19 @@
+# ninja log v5
+49	2047	8143091627621026	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	8287ecb0ba450366
+60	2065	8143091627621026	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	6c8c021163b8999b
+87	2395	8143091631174641	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	60f5c5712e26c675
+1	2083	8143091627975194	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	b99761abca0cb893
+26	2234	8143091629563846	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	c4a54f5b62502680
+74	2189	8143091629115921	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	95b3adddaa336806
+2672	2889	8143091636127670	C:/Users/ravik/flutter soures/Puzzle-Game/cyclerace/FreerideFury/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5u597214/obj/armeabi-v7a/libgame.so	68a982e6bd7477cc
+37	2489	8143091632120729	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	bb04e64ae42165e3
+16	2672	8143091633868859	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	5413cf7eb88d693a
+76	1692	8143856681637339	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	6c8c021163b8999b
+49	1701	8143856681769294	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	8287ecb0ba450366
+21	1723	8143856681965459	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	b99761abca0cb893
+89	1759	8143856682350926	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	95b3adddaa336806
+35	1776	8143856682504171	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	c4a54f5b62502680
+105	1913	8143856683859087	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	60f5c5712e26c675
+62	2054	8143856685317028	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	bb04e64ae42165e3
+10	2180	8143856686535042	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	5413cf7eb88d693a
+2180	2471	8143856689481427	C:/Users/ravik/flutter soures/Puzzle-Game/cyclerace/FreerideFury/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5u597214/obj/armeabi-v7a/libgame.so	68a982e6bd7477cc

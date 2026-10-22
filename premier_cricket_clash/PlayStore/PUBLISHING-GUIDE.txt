@@ -1,0 +1,111 @@
+PREMIER CRICKET CLASH 2027 - HOW TO PUBLISH ON GOOGLE PLAY
+==========================================================
+
+WHAT IS READY
+  Builds\PremierCricketClash2027.aab   signed release App Bundle (upload this)
+  Signing\                             your upload key + passwords - BACK THIS FOLDER UP NOW
+  PlayStore\icon-512.png               app icon
+  PlayStore\feature-graphic-1024x500.png
+  PlayStore\screenshots\*.png          8 phone screenshots
+  PlayStore\store-listing.txt          name, short + full description
+  PlayStore\privacy-policy.html        privacy policy page
+
+  Package name : com.rkgame.premiercricketclase
+  Version      : 1.0.2 (version code 3)
+  Target SDK   : Android 16 (API 36)   64-bit: yes (arm64 + armv7)
+
+
+STEP 1 - BACK UP THE SIGNING FOLDER
+  Copy the whole "Signing" folder to a USB drive AND to Google Drive (or email it to
+  yourself). Without it (and the password in KEYSTORE-INFO.txt) you cannot publish updates.
+
+
+STEP 2 - PUT THE PRIVACY POLICY ONLINE (Play needs a public link)
+  Easiest free way - Google Sites:
+    1. Open sites.google.com > Blank site.
+    2. Title: "Premier Cricket Clash 2027 - Privacy Policy".
+    3. Open privacy-policy.html in Notepad, copy the text into the page
+       (replace YOUR-EMAIL@example.com with your real support email).
+    4. Publish > copy the link (e.g. https://sites.google.com/view/pcc2027-privacy).
+  (GitHub Pages also works: upload privacy-policy.html to a public repo and enable Pages.)
+
+
+STEP 3 - GOOGLE PLAY DEVELOPER ACCOUNT
+  play.google.com/console > sign up (one-time US$25), verify your identity.
+  NOTE for new PERSONAL accounts: before production you must run a CLOSED TEST with at
+  least 12 testers who stay opted in for 14 days in a row (Google rule). Organisation
+  accounts skip this.
+
+
+STEP 4 - CREATE THE APP
+  Play Console > Create app
+    App name        : Premier Cricket Clash 2027
+    Default language: English (United States) - en-US
+    App or game     : Game
+    Free or paid    : Free
+    Tick the declarations > Create app
+
+
+STEP 5 - "SET UP YOUR APP" (Dashboard) - the answers
+  Privacy policy        : paste your link from step 2
+  App access            : All functionality is available without any special access
+  Ads                   : No, my app does not contain ads
+  Content rating        : Start questionnaire > email > Category "Game"
+                          Violence: No (it is a sports game)  | Fear: No | Sexuality: No
+                          Language: No | Controlled substances: No | Crude humour: No
+                          Gambling / simulated gambling: No (auction uses fictional
+                          in-game budget, no real money, no chance-based rewards)
+                          User interaction / sharing info / location / purchases: No
+                          Expected result: Everyone / PEGI 3 / IARC 3+
+  Target audience       : 13-15, 16-17, 18 and over (do NOT tick ages under 13 - that
+                          adds the Families programme requirements)
+  News app              : No
+  Data safety           : "Does your app collect or share any of the required user
+                          data types?"  ->  No
+                          (the game stores settings only on the device and sends nothing)
+  Government app        : No
+  Financial features    : My app doesn't provide any financial features
+  Health                : My app does not have any health features
+  App category          : Game > Sports;  Tags: Cricket, Sports
+  Store listing         : copy from store-listing.txt, upload icon-512.png,
+                          feature-graphic-1024x500.png and the 8 screenshots
+                          (phone screenshots; tablet screenshots are optional)
+
+
+STEP 6 - UPLOAD THE AAB
+  Personal account (12 testers rule):
+    Test and release > Testing > Closed testing > Create track (or use "Alpha")
+    > Testers: create an email list with 12+ Gmail addresses > Save
+    > Create new release
+        App integrity: choose "Use Google-generated key" (Play App Signing) - recommended
+        Upload Builds\PremierCricketClash2027.aab
+        Release name: 1.0.2 (3)   Release notes: "First release"
+    > Next > Save > Send for review / Start rollout to Closed testing
+    Share the opt-in link with your testers; keep 12+ opted in for 14 days.
+    Then Dashboard > "Apply for production" and roll out a Production release
+    (upload the same AAB or a newer version).
+  Organisation account:
+    Test and release > Production > Create new release > upload the AAB > roll out.
+
+  Review usually takes from a few hours up to 7 days.
+
+
+STEP 7 - UPDATES LATER
+  1. In Assets\PCC\Editor\BuildTools.cs raise VersionCode (2, 3, ...) and Version ("1.0.1"...).
+  2. In PowerShell in the project folder:
+        powershell -ExecutionPolicy Bypass -File Tools\pcc.ps1 aab
+     (it signs automatically with Signing\keystore.properties)
+  3. Upload the new Builds\PremierCricketClash2027.aab as a new release.
+
+
+GOOD TO KNOW
+  - REAL PLAYER NAMES: this build ships real cricketers' names (your choice). Google Play
+    can reject or remove apps that use real people's names without a licence
+    (Impersonation / Intellectual property policy), and players or boards can file
+    complaints. Never put real player, league or team names in the listing text,
+    icon, feature graphic or screenshots that show names.
+    If Play rejects it: set "UseRealNames = false" in Assets\PCC\Core\PlayerDb.cs,
+    raise VersionCode, rebuild the AAB and upload again. The game then uses its own
+    generated players, and players can still type any names in EDIT NAMES.
+  - If Play Console shows "debug symbols" or "deobfuscation file" warnings, they are
+    optional and can be ignored for a first release.
