@@ -558,8 +558,8 @@ class GamePainter extends CustomPainter {
       canvas.drawOval(
         Rect.fromCenter(
           center: Offset(g.playerX + 5 + air * 22, g.playerY + 7 + air * 26),
-          width: 26,
-          height: 60,
+          width: g.ride.width - 4,
+          height: g.ride.height - 2,
         ),
         _fill(const Color(0x44000000)),
       );
@@ -569,7 +569,7 @@ class GamePainter extends CustomPainter {
     if (g.shieldTimer > 0) {
       final fading = g.shieldTimer < 2 && (g.time * 10).floor().isOdd;
       if (!fading) {
-        final r = 44 + sin(g.time * 8) * 2;
+        final r = g.ride.height / 2 + 13 + sin(g.time * 8) * 2;
         canvas.drawCircle(Offset.zero, r, _fill(const Color(0x3300E5FF)));
         canvas.drawCircle(Offset.zero, r, _shieldRing);
       }
@@ -577,7 +577,10 @@ class GamePainter extends CustomPainter {
     canvas.rotate(g.tilt + g.crashSpin);
     if (air > 0) canvas.scale(1 + air * 0.4);
     final blink = g.invincibleTimer > 0 && (g.time * 14).floor().isOdd;
-    if (!blink) paintBike(canvas, g.bike, boosting: g.boosting, time: g.time);
+    if (!blink) {
+      paintRide(canvas, g.ride,
+          skin: g.skin, boosting: g.boosting, time: g.time);
+    }
     canvas.restore();
   }
 

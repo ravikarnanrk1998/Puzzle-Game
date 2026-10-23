@@ -11,9 +11,9 @@ class RunReward {
   final bool newBest;
 }
 
-/// The player's saved data: coin wallet, owned bikes, best score and
-/// purchased upgrades. Saved on the device with SharedPreferences, and for
-/// a signed-in player also in the cloud (see CloudSave).
+/// The player's saved data: coin wallet, owned bikes, cars and skins, best
+/// score and purchased upgrades. Saved on the device with SharedPreferences,
+/// and for a signed-in player also in the cloud (see CloudSave).
 class PlayerProgress extends ChangeNotifier {
   PlayerProgress._(this._prefs);
 
@@ -37,6 +37,8 @@ class PlayerProgress extends ChangeNotifier {
   static const _kTracks = 'unlocked_tracks';
   static const _kTrack = 'selected_track';
   static const _kAvatar = 'avatar';
+  static const _kSkins = 'owned_skins';
+  static const _kSkin = 'selected_skin';
 
   /// Diamonds given by the free daily claim.
   static const dailyDiamonds = 1;
@@ -50,8 +52,14 @@ class PlayerProgress extends ChangeNotifier {
   int diamonds = 0;
   int best = 0;
   bool doubleCoins = false;
-  Set<String> owned = {Catalog.bikes.first.id};
-  String selected = Catalog.bikes.first.id;
+
+  /// The bikes and cars the player has, and the one they ride.
+  Set<String> owned = {Catalog.rides.first.id};
+  String selected = Catalog.rides.first.id;
+
+  /// The skins the player has, and the one their ride wears.
+  Set<String> skins = {Catalog.skins.first.id};
+  String skinId = Catalog.skins.first.id;
   final List<String> _delivered = [];
 
   /// The day the daily diamond was last claimed, as '2026-10-13'.
@@ -74,8 +82,11 @@ class PlayerProgress extends ChangeNotifier {
   /// Result of the most recent run, shown on the game over screen.
   RunReward? lastRun;
 
-  BikeSkin get selectedBike => Catalog.bike(selected);
-  bool owns(BikeSkin bike) => owned.contains(bike.id);
+  Ride get selectedRide => Catalog.ride(selected);
+  bool owns(Ride ride) => owned.contains(ride.id);
+
+  Skin get selectedSkin => Catalog.skin(skinId);
+  bool hasSkin(Skin skin) => skins.contains(skin.id);
 
   Track get selectedTrack => Catalog.track(trackId);
   bool hasTrack(Track track) => track.isFree || tracks.contains(track.id);
@@ -91,6 +102,8 @@ class PlayerProgress extends ChangeNotifier {
         dailyClaim: dailyClaim,
         tracks: {...tracks},
         avatar: avatar,
+        skins: {...skins},
+        skin: skinId,
       );
 
   /// Replaces all progress, e.g. with the player's cloud save.
@@ -100,9 +113,12 @@ class PlayerProgress extends ChangeNotifier {
     dailyClaim = data.dailyClaim;
     best = data.best;
     doubleCoins = data.doubleCoins;
-    owned = {Catalog.bikes.first.id, ...data.owned};
-    selected = data.selected ?? Catalog.bikes.first.id;
-    if (!owned.contains(selected)) selected = Catalog.bikes.first.id;
+    owned = {Catalog.rides.first.id, ...data.owned};
+    selected = data.selected ?? Catalog.rides.first.id;
+    if (!owned.contains(selected)) selected = Catalog.rides.first.id;
+    skins = {Catalog.skins.first.id, ...data.skins};
+    skinId = data.skin ?? Catalog.skins.first.id;
+    if (!skins.contains(skinId)) skinId = Catalog.skins.first.id;
     _delivered
       ..clear()
       ..addAll(data.delivered);
@@ -124,9 +140,12 @@ class PlayerProgress extends ChangeNotifier {
     wallet = p.getInt(_kWallet) ?? 0;
     best = p.getInt(_kBest) ?? 0;
     doubleCoins = p.getBool(_kDouble) ?? false;
-    owned = {Catalog.bikes.first.id, ...?p.getStringList(_kOwned)};
-    selected = p.getString(_kSelected) ?? Catalog.bikes.first.id;
-    if (!owned.contains(selected)) selected = Catalog.bikes.first.id;
+    owned = {Catalog.rides.first.id, ...?p.getStringList(_kOwned)};
+    selected = p.getString(_kSelected) ?? Catalog.rides.first.id;
+    if (!owned.contains(selected)) selected = Catalog.rides.first.id;
+    skins = {Catalog.skins.first.id, ...?p.getStringList(_kSkins)};
+    skinId = p.getString(_kSkin) ?? Catalog.skins.first.id;
+    if (!skins.contains(skinId)) skinId = Catalog.skins.first.id;
     _delivered.addAll(p.getStringList(_kDelivered) ?? const []);
     owner = p.getString(_kOwner);
     diamonds = p.getInt(_kDiamonds) ?? 0;
@@ -151,6 +170,8 @@ class PlayerProgress extends ChangeNotifier {
       p.setBool(_kDouble, doubleCoins);
       p.setStringList(_kOwned, owned.toList());
       p.setString(_kSelected, selected);
+      p.setStringList(_kSkins, skins.toList());
+      p.setString(_kSkin, skinId);
       p.setStringList(_kDelivered, _delivered);
       final owner = this.owner;
       if (owner == null) {
@@ -232,26 +253,51 @@ class PlayerProgress extends ChangeNotifier {
     _save();
   }
 
-  /// Buys a coin-priced bike and equips it. Returns false if not possible.
-  bool buyWithCoins(BikeSkin bike) {
-    if (owns(bike) || bike.isPremium || bike.coinPrice <= 0) return false;
-    if (wallet < bike.coinPrice) return false;
-    wallet -= bike.coinPrice;
-    owned.add(bike.id);
-    selected = bike.id;
+  /// Buys a coin-priced bike or car and rides it. Returns false if not
+  /// possible.
+  bool buyWithCoins(Ride ride) {
+    if (owns(ride) || ride.isPremium || ride.coinPrice <= 0) return false;
+    if (wallet < ride.coinPrice) return false;
+    wallet -= ride.coinPrice;
+    owned.add(ride.id);
+    selected = ride.id;
     _save();
     return true;
   }
 
-  void select(BikeSkin bike) {
-    if (!owns(bike) || selected == bike.id) return;
-    selected = bike.id;
+  void select(Ride ride) {
+    if (!owns(ride) || selected == ride.id) return;
+    selected = ride.id;
     _save();
   }
 
   /// Returns true if this unlocked something new.
-  bool unlockBike(String id) {
+  bool unlockRide(String id) {
     if (!owned.add(id)) return false;
+    _save();
+    return true;
+  }
+
+  /// Buys a coin-priced skin and puts it on. Returns false if not possible.
+  bool buySkin(Skin skin) {
+    if (hasSkin(skin) || skin.isPremium || skin.coinPrice <= 0) return false;
+    if (wallet < skin.coinPrice) return false;
+    wallet -= skin.coinPrice;
+    skins.add(skin.id);
+    skinId = skin.id;
+    _save();
+    return true;
+  }
+
+  void selectSkin(Skin skin) {
+    if (!hasSkin(skin) || skinId == skin.id) return;
+    skinId = skin.id;
+    _save();
+  }
+
+  /// Returns true if this unlocked something new.
+  bool unlockSkin(String id) {
+    if (!skins.add(id)) return false;
     _save();
     return true;
   }

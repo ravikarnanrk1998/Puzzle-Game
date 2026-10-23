@@ -30,7 +30,7 @@ abstract class SaveBackend {
 }
 
 /// Keeps [PlayerProgress] and the signed-in player's cloud save in step, so
-/// coins, bikes and purchases survive a reinstall or a new phone.
+/// coins, rides, skins and purchases survive a reinstall or a new phone.
 ///
 /// The game still starts from the copy on the device. Every change made
 /// here is also sent to the cloud, and every change in the cloud (another
@@ -165,6 +165,7 @@ class FirestoreSaves implements SaveBackend {
     List<String> strings(Object? v) =>
         v is List ? v.whereType<String>().toList() : const [];
     final selected = doc['selected'],
+        skin = doc['skin'],
         dailyClaim = doc['dailyClaim'],
         avatar = doc['avatar'];
     return SaveData(
@@ -178,6 +179,8 @@ class FirestoreSaves implements SaveBackend {
       dailyClaim: dailyClaim is String ? dailyClaim : null,
       tracks: strings(doc['tracks']).toSet(),
       avatar: avatar is String ? avatar : null,
+      skins: strings(doc['skins']).toSet(),
+      skin: skin is String ? skin : null,
     );
   }
 
@@ -192,9 +195,12 @@ class FirestoreSaves implements SaveBackend {
       if (delta.dailyClaim != null) 'dailyClaim': delta.dailyClaim,
       if (delta.best != null) 'best': delta.best,
       if (delta.doubleCoins) 'doubleCoins': true,
-      if (delta.bikes.isNotEmpty)
-        'owned': FieldValue.arrayUnion(delta.bikes.toList()),
+      if (delta.rides.isNotEmpty)
+        'owned': FieldValue.arrayUnion(delta.rides.toList()),
       if (delta.selected != null) 'selected': delta.selected,
+      if (delta.skins.isNotEmpty)
+        'skins': FieldValue.arrayUnion(delta.skins.toList()),
+      if (delta.skin != null) 'skin': delta.skin,
       if (delta.avatar != null) 'avatar': delta.avatar,
       if (delta.orders.isNotEmpty)
         'delivered': FieldValue.arrayUnion(delta.orders),

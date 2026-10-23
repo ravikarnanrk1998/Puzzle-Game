@@ -142,8 +142,6 @@ class BikeGame extends ChangeNotifier {
   static const double roadRight = roadLeft + roadWidth;
   static const int laneCount = 4;
   static const double laneWidth = roadWidth / laneCount;
-  static const double playerWidth = 30;
-  static const double playerHeight = 62;
   static const int startLives = 3;
   static const int maxLives = 5;
   static const double levelDistance = 700;
@@ -185,6 +183,10 @@ class BikeGame extends ChangeNotifier {
   /// Whether completing levels earns diamonds. Off for 1 vs 1 matches.
   bool levelDiamonds = true;
 
+  /// Whether a ride's infinity nitro works. Off for 1 vs 1 matches, which
+  /// it would always win.
+  bool allowInfiniteNitro = true;
+
   /// Called when a run completes the level that unlocks the next track
   /// ([Track.unlockLevel]). Returns true if that track was locked until
   /// now.
@@ -197,7 +199,10 @@ class BikeGame extends ChangeNotifier {
   double offsetX = 0;
 
   GamePhase phase = GamePhase.menu;
-  BikeSkin bike = Catalog.bikes.first;
+
+  /// The bike or car being ridden, and the skin on it.
+  Ride ride = Catalog.rides.first;
+  Skin skin = Catalog.skins.first;
   Track _track = Catalog.tracks.first;
   bool _sized = false;
 
@@ -229,6 +234,9 @@ class BikeGame extends ChangeNotifier {
 
   /// Whether the one continue per run has been used.
   bool revived = false;
+
+  /// Set when the run was ended by the player rather than a crash.
+  bool finished = false;
 
   /// Coins already handed to the wallet this run (before a continue).
   int coinsBanked = 0;
@@ -263,8 +271,12 @@ class BikeGame extends ChangeNotifier {
   /// How high the bike is off the road: 0 on it, 1 at the top of a jump.
   double get air => airTimer > 0 ? sin(pi * airTimer / jumpTime) : 0;
 
-  Color get bikeColor => bike.color;
-  bool get canRevive => phase == GamePhase.gameOver && !revived;
+  Color get rideColor => skin.base ?? ride.color;
+  bool get canRevive => phase == GamePhase.gameOver && !revived && !finished;
+
+  /// Nitro that never runs out on this run. With it, once boosting, nothing
+  /// can stop the ride: the player ends the run with [finishRun].
+  bool get infiniteNitro => ride.infiniteNitro && allowInfiniteNitro;
   double get playerX => laneCenter(playerLane);
   double get playerY => viewHeight - 175;
   int get scoreValue => score.floor();
@@ -313,10 +325,10 @@ class BikeGame extends ChangeNotifier {
     score = 0;
     coins = 0;
     level = 1;
-    lives = bike.startLives;
-    nitro = bike.startNitro;
+    lives = ride.startLives;
+    nitro = ride.startNitro;
     boosting = false;
-    shieldTimer = bike.startShield;
+    shieldTimer = ride.startShield;
     invincibleTimer = 0;
     shake = 0;
     combo = 0;
@@ -327,6 +339,7 @@ class BikeGame extends ChangeNotifier {
     airTimer = 0;
     skidTimer = 0;
     revived = false;
+    finished = false;
     coinsBanked = 0;
     diamondsEarned = 0;
     targetLane = 1;
@@ -401,6 +414,7 @@ class BikeGame extends ChangeNotifier {
   /// Ends the run where it stands, without a crash.
   void finishRun() {
     if (phase != GamePhase.playing && phase != GamePhase.paused) return;
+    finished = true;
     _endGame();
     notifyListeners();
   }
@@ -452,7 +466,7 @@ class BikeGame extends ChangeNotifier {
     final target = _baseSpeed * (boosting ? 1.6 : 1.0);
     speed += (target - speed) * min(1.0, dt * (boosting ? 3.0 : 1.2));
 
-    if (boosting) {
+    if (boosting && !infiniteNitro) {
       nitro -= dt / 3.5;
       if (nitro <= 0) {
         nitro = 0;
@@ -815,7 +829,7 @@ class BikeGame extends ChangeNotifier {
     }
 
     for (final v in vehicles) {
-      if (!v.passed && v.y - v.height / 2 > playerY + playerHeight / 2) {
+      if (!v.passed && v.y - v.height / 2 > playerY + ride.height / 2) {
         v.passed = true;
         if (isRunning && invincibleTimer <= 0 && !boosting && airTimer <= 0) {
           final dx = (laneCenter(v.x) - playerX).abs();
@@ -886,8 +900,8 @@ class BikeGame extends ChangeNotifier {
 
   Rect get _playerRect => Rect.fromCenter(
         center: Offset(playerX, playerY),
-        width: playerWidth - 8,
-        height: playerHeight - 14,
+        width: ride.width - 8,
+        height: ride.height - 14,
       );
 
   void _checkCollisions() {
@@ -940,7 +954,7 @@ class BikeGame extends ChangeNotifier {
       phase = GamePhase.crashing;
       crashTimer = 1.4;
       boosting = false;
-      _burst(playerX, playerY, bikeColor, 30, 380);
+      _burst(playerX, playerY, rideColor, 30, 380);
       _addText('CRASH!', worldWidth / 2, viewHeight * 0.4,
           const Color(0xFFFF5252), size: 48, life: 1.4);
     } else {
@@ -1148,7 +1162,7 @@ class BikeGame extends ChangeNotifier {
     final crashed = phase == GamePhase.crashing;
     _exhaustTimer = boosting ? 0.012 : (crashed ? 0.03 : 0.07);
     final x = playerX + (_rng.nextDouble() - 0.5) * 6;
-    final y = playerY + 30;
+    final y = playerY + ride.height / 2 - 1;
     if (boosting) {
       particles.add(Particle(
         x,

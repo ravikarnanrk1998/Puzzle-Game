@@ -76,7 +76,9 @@ class _GameScreenState extends State<GameScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _game.bike = widget.progress.selectedBike;
+    _game
+      ..ride = widget.progress.selectedRide
+      ..skin = widget.progress.selectedSkin;
     _game.setTrack(_track);
     widget.progress.addListener(_syncProgress);
     _game.addListener(_syncMusic);
@@ -147,8 +149,11 @@ class _GameScreenState extends State<GameScreen>
 
   void _start() {
     _game.setTrack(_track);
-    // Levels earn diamonds in solo runs only, not in a 1 vs 1 match.
-    _game.levelDiamonds = _versus == null;
+    // Levels earn diamonds, and infinity nitro works, in solo runs only:
+    // not in a 1 vs 1 match.
+    _game
+      ..levelDiamonds = _versus == null
+      ..allowInfiniteNitro = _versus == null;
     _game.startGame();
     _focus.requestFocus();
   }
@@ -226,7 +231,9 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _syncProgress() {
-    _game.bike = widget.progress.selectedBike;
+    _game
+      ..ride = widget.progress.selectedRide
+      ..skin = widget.progress.selectedSkin;
     // The menu shows the road of the track picked for the next run.
     if (_game.phase == GamePhase.menu) _game.setTrack(_track);
   }
@@ -247,11 +254,11 @@ class _GameScreenState extends State<GameScreen>
       _game.revive();
       _focus.requestFocus();
     } else {
-      _openShop(tab: 1);
+      _openShop(tab: ShopScreen.coinsTab);
     }
   }
 
-  Future<void> _openShop({int tab = 0}) async {
+  Future<void> _openShop({int tab = ShopScreen.bikesTab}) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ShopScreen(
         progress: widget.progress,
@@ -290,7 +297,7 @@ class _GameScreenState extends State<GameScreen>
           progress: widget.progress,
           uid: account.uid!,
           name: account.playerName,
-          onGetDiamonds: () => _openShop(tab: 2),
+          onGetDiamonds: () => _openShop(tab: ShopScreen.diamondsTab),
         ),
       ),
     );
@@ -432,6 +439,7 @@ class _GameScreenState extends State<GameScreen>
               onResume: _game.resume,
               onRestart: versus == null ? _start : null,
               onMenu: versus == null ? _menu : _leaveVersus,
+              onFinish: _game.infiniteNitro ? _game.finishRun : null,
             ),
           ],
         );
@@ -449,7 +457,7 @@ class _GameScreenState extends State<GameScreen>
           onRestart: _start,
           onRevive: _revive,
           onMenu: _menu,
-          onShop: () => _openShop(tab: 1),
+          onShop: () => _openShop(tab: ShopScreen.coinsTab),
         );
     }
   }

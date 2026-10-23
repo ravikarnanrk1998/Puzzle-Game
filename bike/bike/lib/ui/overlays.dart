@@ -370,11 +370,13 @@ class _BoostButton extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.bolt, color: color, size: 34),
+                // Nitro that never runs out shows as a big infinity sign.
                 Text(
-                  active ? 'BOOST!' : 'NITRO',
+                  game.infiniteNitro ? '∞' : (active ? 'BOOST!' : 'NITRO'),
                   style: TextStyle(
                     color: color,
-                    fontSize: 11,
+                    fontSize: game.infiniteNitro ? 20 : 11,
+                    height: 1,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1,
                   ),
@@ -689,10 +691,8 @@ class MenuOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pulse = 1 + sin(game.time * 4) * 0.04;
-    final bike = progress.selectedBike;
-    // A very dark bike would vanish on the dark pill: its accent shows.
-    final bikeColor =
-        bike.color.computeLuminance() < 0.05 ? bike.accent : bike.color;
+    final ride = progress.selectedRide;
+    final skin = progress.selectedSkin;
     final open = Catalog.tracks.where(progress.hasTrack).length;
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -757,10 +757,18 @@ class MenuOverlay extends StatelessWidget {
                             runSpacing: 8,
                             children: [
                               _StatPill(
-                                icon: Icons.two_wheeler,
-                                color: bikeColor,
-                                text: bike.name.toUpperCase(),
+                                icon: ride.isCar
+                                    ? Icons.directions_car
+                                    : Icons.two_wheeler,
+                                color: ride.labelColor,
+                                text: ride.name.toUpperCase(),
                               ),
+                              if (skin != Catalog.skins.first)
+                                _StatPill(
+                                  icon: Icons.format_paint,
+                                  color: const Color(0xFFEA80FC),
+                                  text: skin.name.toUpperCase(),
+                                ),
                               if (progress.best > 0)
                                 _StatPill(
                                   icon: Icons.emoji_events,
@@ -891,7 +899,7 @@ class MenuOverlay extends StatelessWidget {
   }
 }
 
-/// A small fact on the menu, such as the bike being ridden.
+/// A small fact on the menu, such as the bike or car being ridden.
 class _StatPill extends StatelessWidget {
   const _StatPill({
     required this.icon,
@@ -1175,6 +1183,7 @@ class PauseOverlay extends StatelessWidget {
     required this.onResume,
     required this.onRestart,
     required this.onMenu,
+    this.onFinish,
   });
 
   final VoidCallback onResume;
@@ -1182,6 +1191,10 @@ class PauseOverlay extends StatelessWidget {
   /// Null hides the button: a 1 vs 1 run can't be started over.
   final VoidCallback? onRestart;
   final VoidCallback onMenu;
+
+  /// Ends the run and keeps its coins and score. Only for a run on infinity
+  /// nitro, which never crashes to end by itself; null hides the button.
+  final VoidCallback? onFinish;
 
   @override
   Widget build(BuildContext context) {
@@ -1209,6 +1222,15 @@ class PauseOverlay extends StatelessWidget {
                     icon: Icons.play_arrow_rounded,
                     onTap: onResume,
                   ),
+                  if (onFinish != null) ...[
+                    const SizedBox(height: 14),
+                    BigButton(
+                      label: 'FINISH RUN',
+                      icon: Icons.flag_rounded,
+                      onTap: onFinish!,
+                      colors: const [Color(0xFF00E676), Color(0xFF00897B)],
+                    ),
+                  ],
                   if (onRestart != null) ...[
                     const SizedBox(height: 14),
                     BigButton(
@@ -1258,6 +1280,9 @@ class GameOverOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final run = progress.lastRun;
     final canPayRevive = progress.wallet >= BikeGame.reviveCost;
+    final (IconData icon, String title, Color color) = game.finished
+        ? (Icons.flag_rounded, 'RUN FINISHED', const Color(0xFF69F0AE))
+        : (Icons.car_crash, 'CRASHED!', const Color(0xFFFF5252));
     return ColoredBox(
       color: const Color(0xAA000000),
       child: SafeArea(
@@ -1269,12 +1294,11 @@ class GameOverOverlay extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.car_crash,
-                        color: Color(0xFFFF5252), size: 48),
-                    const Text(
-                      'CRASHED!',
+                    Icon(icon, color: color, size: 48),
+                    Text(
+                      title,
                       style: TextStyle(
-                        color: Color(0xFFFF5252),
+                        color: color,
                         fontSize: 36,
                         fontWeight: FontWeight.w900,
                         fontStyle: FontStyle.italic,

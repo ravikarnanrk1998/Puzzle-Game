@@ -48,7 +48,12 @@ The IDs must match **exactly**. The prices are only suggestions; pick your own.
 | `coins_large`  | 80,000 Coins      | +80,000 coins (can buy again)       | ₹249            |
 | `double_coins` | Double Coins      | Coins count x2 forever (one-time)   | ₹99             |
 | `bike_gold`    | Gold Rush Bike    | Premium bike, full nitro + shield   | ₹149            |
-| `bike_neon`    | Neon Ghost Bike   | Premium bike, 5 lives + shield      | ₹199            |
+| `bike_neons`    | Neon Ghost Bike   | Premium bike, 5 lives + shield      | ₹199            |
+| `bike_inferno` | Inferno R1 Bike   | Premium superbike, 5 lives + nitro + shield | ₹249    |
+| `car_hyper`    | Hyper X Car       | Premium car, 5 lives + nitro + shield | ₹299          |
+| `car_monster`  | Monster Truck     | Premium truck, infinity nitro (not in 1 VS 1) | ₹399  |
+| `skin_chrome`  | Liquid Chrome Skin | Premium skin for any bike or car   | ₹99             |
+| `skin_galaxy`  | Galaxy Skin       | Premium skin for any bike or car    | ₹99             |
 | `diamonds_1`   | 1 Diamond         | +1 diamond (can buy again)          | ₹10             |
 | `diamonds_10`  | 10 Diamonds       | +10 diamonds (can buy again)        | ₹79             |
 | `diamonds_20`  | 20 Diamonds       | +20 diamonds (can buy again)        | ₹149            |
@@ -57,6 +62,7 @@ The IDs must match **exactly**. The prices are only suggestions; pick your own.
 
 Diamonds pay for 1 VS 1 matches (see section 7). Until the five `diamonds_…` products exist
 and are Active, the **DIAMONDS** tab in the garage shows "BUY" buttons that do nothing.
+The same goes for the premium bikes, cars and skins in the **BIKES**, **CARS** and **SKINS** tabs.
 
 Set every product to **Active**.
 
@@ -75,7 +81,10 @@ Graphics are ready in `store_listing/`:
 
 - App icon: `icon_512.png`
 - Feature graphic: `feature_graphic_1024x500.png`
-- Phone screenshots: `screenshot_1_menu.png` … `screenshot_4_garage.png`
+- Phone screenshots: `screenshot_1_race.png` … `screenshot_8_menu.png`, 1080x1920, numbered
+  in the order to upload them.
+- Preview video: `promo_video_1920x1080.mp4`. Play only takes a YouTube link, so upload it to
+  YouTube (public or unlisted, ads off), then paste the link under **Preview video**.
 
 **Short description** (max 80 chars):
 
@@ -184,6 +193,10 @@ the scores it rode offline.
 flutter test tool/store_assets_test.dart
 flutter pub run flutter_launcher_icons
 ```
+
+The preview video's frames come from `flutter test tool/store_video_test.dart`. It renders
+them into `build/store_video/`, and the top of that file has the `ffmpeg` command that turns
+them into the MP4 with the game's music.
 
 ## Notes
 

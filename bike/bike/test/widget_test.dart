@@ -8,6 +8,7 @@ import 'package:bike/shop/player_progress.dart';
 import 'package:bike/shop/store_service.dart';
 import 'package:bike/ui/game_screen.dart';
 import 'package:bike/ui/overlays.dart';
+import 'package:bike/ui/shop_screen.dart';
 import 'package:bike/ui/track_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -183,10 +184,58 @@ void main() {
     });
 
     test('premium bike perks apply at the start of a run', () {
-      final g = newGame()..bike = Catalog.bike('neon');
+      final g = newGame()..ride = Catalog.ride('neon');
       g.startGame();
       expect(g.lives, 5);
       expect(g.shieldTimer, greaterThan(0));
+    });
+
+    test('the monster truck boosts for ever and smashes through traffic', () {
+      final g = newGame()
+        ..ride = Catalog.ride('monster')
+        ..startGame();
+      g.activateBoost();
+      for (var i = 0; i < 60 * 20; i++) {
+        g.update(1 / 60);
+      }
+      expect(g.boosting, isTrue);
+      expect(g.nitro, 1);
+      expect(g.isRunning, isTrue);
+      expect(g.lives, g.ride.startLives);
+      expect(g.vehicles.length + g.texts.length, greaterThan(0),
+          reason: 'there was traffic to smash');
+    });
+
+    test("in 1 VS 1 the monster truck's nitro runs out like any other", () {
+      final g = newGame()
+        ..ride = Catalog.ride('monster')
+        ..allowInfiniteNitro = false
+        ..startGame();
+      g.activateBoost();
+      for (var i = 0; i < 60 * 5; i++) {
+        // No nitro or coins to top it up.
+        g.pickups.clear();
+        g.update(1 / 60);
+      }
+      expect(g.boosting, isFalse);
+    });
+
+    test('a car is bigger than a bike, so traffic hits it from further off',
+        () {
+      for (final (id, hit) in [('red', false), ('cruiser', true)]) {
+        final g = newGame()
+          ..ride = Catalog.ride(id)
+          ..startGame();
+        // Just ahead, and keeping pace with the player.
+        g.vehicles.add(Vehicle(
+          lane: g.targetLane,
+          y: g.playerY - 64,
+          speed: g.speed,
+          color: Colors.red,
+        ));
+        g.update(1 / 60);
+        expect(g.lives, g.ride.startLives - (hit ? 1 : 0), reason: id);
+      }
     });
   });
 
@@ -445,14 +494,55 @@ void main() {
 
     test('bikes can be bought with enough coins only', () {
       final p = PlayerProgress.memory();
-      final blue = Catalog.bike('blue');
+      final blue = Catalog.ride('blue');
       expect(p.buyWithCoins(blue), isFalse);
       p.addCoins(blue.coinPrice);
       expect(p.buyWithCoins(blue), isTrue);
       expect(p.wallet, 0);
       expect(p.selected, 'blue');
-      expect(p.buyWithCoins(Catalog.bike('gold')), isFalse,
+      expect(p.buyWithCoins(Catalog.ride('gold')), isFalse,
           reason: 'premium bikes need real money');
+    });
+
+    test('cars are bought and ridden like bikes', () {
+      final p = PlayerProgress.memory();
+      final cruiser = Catalog.ride('cruiser');
+      expect(cruiser.isCar, isTrue);
+      p.addCoins(cruiser.coinPrice);
+      expect(p.buyWithCoins(cruiser), isTrue);
+      expect(p.selectedRide, cruiser);
+      expect(p.buyWithCoins(Catalog.ride('hyper')), isFalse,
+          reason: 'premium cars need real money');
+    });
+
+    test('skins are bought with coins and worn by any ride', () {
+      final p = PlayerProgress.memory();
+      final flames = Catalog.skin('flames');
+      expect(p.selectedSkin, Catalog.skins.first);
+      expect(p.buySkin(flames), isFalse);
+      p.addCoins(flames.coinPrice);
+      expect(p.buySkin(flames), isTrue);
+      expect(p.wallet, 0);
+      expect(p.selectedSkin, flames);
+      expect(p.buySkin(Catalog.skin('galaxy')), isFalse,
+          reason: 'premium skins need real money');
+      p.selectSkin(Catalog.skin('chrome'));
+      expect(p.selectedSkin, flames, reason: 'chrome is not owned');
+      p.selectSkin(Catalog.skins.first);
+      expect(p.selectedSkin, Catalog.skins.first,
+          reason: 'the free skin is always there to go back to');
+    });
+
+    test('every bike, car and skin has its own id', () {
+      final rides = Catalog.rides.map((r) => r.id);
+      expect(rides.toSet(), hasLength(rides.length));
+      final skins = Catalog.skins.map((s) => s.id);
+      expect(skins.toSet(), hasLength(skins.length));
+      expect(Catalog.bikes.where((r) => r.isCar), isEmpty);
+      expect(Catalog.cars.where((r) => !r.isCar), isEmpty);
+      expect(Catalog.skins.first.isPremium || Catalog.skins.first.coinPrice > 0,
+          isFalse,
+          reason: 'the first skin is the free one');
     });
 
     test('the free diamond can be claimed once a day', () {
@@ -535,8 +625,21 @@ void main() {
         purchase('bike_gold', 'GPA.3'),
         purchase(Catalog.doubleCoinsId, 'GPA.4'),
       ]);
-      expect(p.owns(Catalog.bike('gold')), isTrue);
+      expect(p.owns(Catalog.ride('gold')), isTrue);
       expect(p.doubleCoins, isTrue);
+    });
+
+    test('premium purchases unlock cars and skins', () async {
+      final p = PlayerProgress.memory();
+      final store = StoreService(p, enabled: false);
+      await store.handlePurchases([
+        purchase('car_hyper', 'GPA.8'),
+        purchase('skin_galaxy', 'GPA.9'),
+      ]);
+      expect(p.owns(Catalog.ride('hyper')), isTrue);
+      expect(p.hasSkin(Catalog.skin('galaxy')), isTrue);
+      expect(Catalog.productIds,
+          containsAll(['bike_inferno', 'car_hyper', 'skin_chrome']));
     });
   });
 
@@ -688,5 +791,76 @@ void main() {
     }
     expect(find.text('Red Rocket'), findsOneWidget);
     expect(find.text('RIDING'), findsOneWidget);
+  });
+
+  testWidgets('a run on infinity nitro is finished from the pause menu, '
+      'keeping its coins', (tester) async {
+    final progress = PlayerProgress.memory()
+      ..unlockRide('monster')
+      ..select(Catalog.ride('monster'));
+    await tester.pumpWidget(BikeRushApp(
+      progress: progress,
+      store: StoreService(progress, enabled: false),
+    ));
+    await tester.tap(find.text('PLAY'));
+    await tester.pump(const Duration(milliseconds: 100));
+    final game = (tester
+            .widget<CustomPaint>(find.byWidgetPredicate(
+                (w) => w is CustomPaint && w.painter is GamePainter))
+            .painter! as GamePainter)
+        .game;
+    expect(find.text('∞'), findsOneWidget, reason: 'on the boost button');
+    game
+      ..coins = 40
+      ..pause();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('FINISH RUN'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(progress.wallet, 40);
+    expect(find.text('RUN FINISHED'), findsOneWidget);
+    expect(find.textContaining('CONTINUE'), findsNothing,
+        reason: 'a run the player finished is not continued');
+  });
+
+  testWidgets('a bike run has no finish button, as it ends with a crash',
+      (tester) async {
+    final progress = PlayerProgress.memory();
+    await tester.pumpWidget(BikeRushApp(
+      progress: progress,
+      store: StoreService(progress, enabled: false),
+    ));
+    await tester.tap(find.text('PLAY'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byIcon(Icons.pause_rounded));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('PAUSED'), findsOneWidget);
+    expect(find.text('FINISH RUN'), findsNothing);
+  });
+
+  testWidgets('the garage sells cars and skins', (tester) async {
+    final stripes = Catalog.skin('stripes');
+    final progress = PlayerProgress.memory()..addCoins(stripes.coinPrice);
+    await tester.pumpWidget(MaterialApp(
+      home: ShopScreen(
+        progress: progress,
+        store: StoreService(progress, enabled: false),
+      ),
+    ));
+    await tester.tap(find.text('CARS'));
+    await tester.pumpAndSettle();
+    expect(find.text('Street Cruiser'), findsOneWidget);
+
+    await tester.tap(find.text('SKINS'));
+    await tester.pumpAndSettle();
+    expect(find.text('EQUIPPED'), findsOneWidget, reason: 'the free skin');
+    await tester.tap(find.ancestor(
+      of: find.text(formatNumber(stripes.coinPrice)),
+      matching: find.byWidgetPredicate((w) => w is FilledButton),
+    ));
+    await tester.pump();
+    expect(progress.selectedSkin, stripes);
+    expect(progress.wallet, 0);
+    expect(find.text('USE'), findsOneWidget,
+        reason: 'the free skin can be put back on');
   });
 }

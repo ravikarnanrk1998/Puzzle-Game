@@ -153,9 +153,14 @@ class StoreService extends ChangeNotifier {
       }
       return;
     }
-    final bike = Catalog.bikeForProduct(id);
-    if (bike != null && progress.unlockBike(bike.id)) {
-      _messages.add('${bike.name} unlocked!');
+    final ride = Catalog.rideForProduct(id);
+    if (ride != null) {
+      if (progress.unlockRide(ride.id)) _messages.add('${ride.name} unlocked!');
+      return;
+    }
+    final skin = Catalog.skinForProduct(id);
+    if (skin != null && progress.unlockSkin(skin.id)) {
+      _messages.add('${skin.name} skin unlocked!');
     }
   }
 

@@ -4,25 +4,26 @@
 //   flutter pub run flutter_launcher_icons
 //
 // Output: assets/icon/*.png (launcher icon sources) and store_listing/*.png.
+// The screenshots are numbered in the order to upload them.
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:bike/game/bike_art.dart';
 import 'package:bike/game/bike_game.dart';
-import 'package:bike/game/game_painter.dart';
 import 'package:bike/main.dart';
 import 'package:bike/shop/catalog.dart';
 import 'package:bike/shop/player_progress.dart';
 import 'package:bike/shop/store_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'store_kit.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(_loadFonts);
+  setUpAll(loadFonts);
 
   test('app icon', () async {
     const full = Size(1024, 1024);
@@ -41,7 +42,8 @@ void main() {
 
   test('feature graphic', () async {
     await _save('store_listing/feature_graphic_1024x500.png',
-        const Size(1024, 500), _featureGraphic);
+        const Size(1024, 500), _featureGraphic,
+        alpha: false);
   });
 
   testWidgets('phone screenshots', (tester) async {
@@ -49,8 +51,14 @@ void main() {
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
-    final progress = PlayerProgress.memory()..addCoins(3250);
+    final progress = PlayerProgress.memory()..addCoins(48250);
     progress.recordRun(score: 12840, coins: 0);
+    // What the scenes below ride, and the garage shows as owned.
+    progress
+      ..unlockRide('monster')
+      ..unlockRide('turbo')
+      ..unlockSkin('flames')
+      ..unlockTrack(Catalog.track('mountain'));
     final key = GlobalKey();
     await tester.pumpWidget(RepaintBoundary(
       key: key,
@@ -59,83 +67,85 @@ void main() {
         store: StoreService(progress, enabled: false),
       ),
     ));
+    await loadImages(tester);
     await _frames(tester, 40);
-    await _shot(tester, key, 'store_listing/screenshot_1_menu.png');
+    await _shot(tester, key, 'store_listing/screenshot_8_menu.png');
 
     await tester.tap(find.text('PLAY'));
     await _frames(tester, 10);
-    final game = (tester
-            .widget<CustomPaint>(find.byWidgetPredicate(
-                (w) => w is CustomPaint && w.painter is GamePainter))
-            .painter! as GamePainter)
-        .game;
+    final game = gameOf(tester);
 
-    _stageRace(game);
+    stageRace(game);
     await _frames(tester, 1);
     game.texts.clear();
     await _frames(tester, 1);
-    await _shot(tester, key, 'store_listing/screenshot_2_race.png');
+    await _shot(tester, key, 'store_listing/screenshot_1_race.png');
 
-    _stageRace(game);
+    stageRace(game);
     game.nitro = 1;
     game.activateBoost();
     await _frames(tester, 25);
     game.texts.clear();
     await _frames(tester, 1);
-    await _shot(tester, key, 'store_listing/screenshot_3_nitro.png');
+    await _shot(tester, key, 'store_listing/screenshot_4_nitro.png');
+
+    // The monster truck on infinity nitro, smashing a car.
+    await _rideNext(tester, game, () {
+      progress.select(Catalog.ride('monster'));
+    });
+    stageRace(game);
+    game
+      ..level = 5
+      ..distance = 3000
+      ..score = 15360
+      ..coins = 84
+      ..activateBoost()
+      ..vehicles.add(Vehicle(
+          lane: 1,
+          y: game.playerY - 20,
+          speed: 250,
+          color: const Color(0xFFFFEE58)));
+    await _frames(tester, 8);
+    await _shot(tester, key, 'store_listing/screenshot_2_monster_truck.png');
+
+    // The Mountain Pass in the Turbo GT, with flames on.
+    await _rideNext(tester, game, () {
+      progress
+        ..select(Catalog.ride('turbo'))
+        ..selectSkin(Catalog.skin('flames'))
+        ..selectTrack(Catalog.track('mountain'));
+    });
+    stageMountain(game);
+    await _frames(tester, 2);
+    await _shot(tester, key, 'store_listing/screenshot_3_mountain.png');
 
     game.goToMenu();
+    progress
+      ..selectSkin(Catalog.skins.first)
+      ..selectTrack(Catalog.tracks.first);
     await _frames(tester, 5);
     await tester.tap(find.text('GARAGE'));
     await _frames(tester, 30);
-    await _shot(tester, key, 'store_listing/screenshot_4_garage.png');
+    await _shot(tester, key, 'store_listing/screenshot_7_bikes.png');
+    progress.selectSkin(Catalog.skin('flames'));
+    // Long enough for the tap's highlight on the tab to fade.
+    await tester.tap(find.text('CARS'));
+    await _frames(tester, 90);
+    await _shot(tester, key, 'store_listing/screenshot_5_cars.png');
+    await tester.tap(find.text('SKINS'));
+    await _frames(tester, 90);
+    await _shot(tester, key, 'store_listing/screenshot_6_skins.png');
   });
 }
 
-void _stageRace(BikeGame g) {
-  g
-    ..playTime = 10
-    ..lives = 3
-    ..invincibleTimer = 0
-    ..levelBannerTimer = 0
-    ..level = 3
-    ..distance = 1650
-    ..score = 4820
-    ..coins = 37
-    ..nitro = 0.8
-    ..speed = 520
-    ..targetLane = 1
-    ..playerLane = 1;
-  g.texts.clear();
-  g.vehicles
-    ..clear()
-    ..addAll([
-      Vehicle(
-          lane: 2,
-          y: g.playerY - 90,
-          speed: 250,
-          color: const Color(0xFF42A5F5)),
-      Vehicle(
-          lane: 0,
-          y: 170,
-          speed: 200,
-          color: const Color(0xFF26A69A),
-          kind: VehicleKind.truck),
-      Vehicle(
-          lane: 3,
-          y: 260,
-          speed: 230,
-          color: const Color(0xFFFFEE58))
-        ..signalDir = -1
-        ..signal = 0.6,
-    ]);
-  g.pickups
-    ..clear()
-    ..addAll([
-      for (var i = 0; i < 4; i++)
-        Pickup(PickupKind.coin, 1, g.playerY - 150 - i * 46),
-      Pickup(PickupKind.nitro, 2, 90),
-    ]);
+/// Back to the menu, [pick] what to ride, and PLAY.
+Future<void> _rideNext(
+    WidgetTester tester, BikeGame game, VoidCallback pick) async {
+  game.goToMenu();
+  pick();
+  await _frames(tester, 2);
+  await tester.tap(find.text('PLAY'));
+  await _frames(tester, 10);
 }
 
 Future<void> _frames(WidgetTester tester, int n) async {
@@ -149,54 +159,29 @@ Future<void> _shot(WidgetTester tester, GlobalKey key, String path) async {
       key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
   await tester.runAsync(() async {
     final image = await boundary.toImage(pixelRatio: 3);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
     File(path)
       ..createSync(recursive: true)
-      ..writeAsBytesSync(data!.buffer.asUint8List());
+      ..writeAsBytesSync(await png24(image));
   });
 }
 
-Future<void> _save(
-    String path, Size size, void Function(Canvas, Size) draw) async {
+/// Draws a picture with [draw] and saves it. Without [alpha], as a 24-bit
+/// PNG, which is what Google Play wants for listing graphics.
+Future<void> _save(String path, Size size, void Function(Canvas, Size) draw,
+    {bool alpha = true}) async {
   final recorder = ui.PictureRecorder();
   draw(Canvas(recorder), size);
   final image = await recorder
       .endRecording()
       .toImage(size.width.round(), size.height.round());
-  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  final bytes = alpha
+      ? (await image.toByteData(format: ui.ImageByteFormat.png))!
+          .buffer
+          .asUint8List()
+      : await png24(image);
   File(path)
     ..createSync(recursive: true)
-    ..writeAsBytesSync(data!.buffer.asUint8List());
-}
-
-/// Loads the Roboto and Material Icons fonts that ship with the Flutter SDK,
-/// so text renders properly instead of as test boxes.
-Future<void> _loadFonts() async {
-  // flutter_tester lives in <flutter>/bin/cache/artifacts/engine/<platform>/
-  final artifacts = File(Platform.resolvedExecutable).parent.parent.parent;
-  final dir = '${artifacts.path}${Platform.pathSeparator}material_fonts';
-  Future<ByteData> read(String name) async {
-    final bytes =
-        await File('$dir${Platform.pathSeparator}$name').readAsBytes();
-    return ByteData.view(bytes.buffer);
-  }
-
-  final roboto = FontLoader('Roboto');
-  for (final f in [
-    'roboto-regular.ttf',
-    'roboto-medium.ttf',
-    'roboto-bold.ttf',
-    'roboto-black.ttf',
-    'roboto-italic.ttf',
-    'roboto-bolditalic.ttf',
-    'roboto-blackitalic.ttf',
-  ]) {
-    roboto.addFont(read(f));
-  }
-  await roboto.load();
-  await (FontLoader('MaterialIcons')
-        ..addFont(read('materialicons-regular.otf')))
-      .load();
+    ..writeAsBytesSync(bytes);
 }
 
 // ------------------------------------------------------------------- art
@@ -251,7 +236,7 @@ void _iconBike(Canvas c, Size s) {
   c.translate(s.width / 2, s.height / 2);
   c.rotate(-0.12);
   c.scale(s.width / 1024 * 9.5);
-  paintBike(c, Catalog.bikes.first);
+  paintRide(c, Catalog.bikes.first);
   c.restore();
 }
 
@@ -304,7 +289,7 @@ void _featureGraphic(Canvas c, Size s) {
   c.translate(-60, 40);
   c.rotate(pi / 2);
   c.scale(3.2);
-  paintBike(c, Catalog.bikes.first, boosting: true, time: 0.4);
+  paintRide(c, Catalog.bikes.first, boosting: true, time: 0.4);
   c.restore();
   c.restore();
 

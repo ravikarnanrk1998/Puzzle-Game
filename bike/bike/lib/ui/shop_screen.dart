@@ -25,8 +25,14 @@ class ShopScreen extends StatefulWidget {
   final PlayerProgress progress;
   final StoreService store;
 
-  /// 0 = bikes, 1 = coins, 2 = diamonds.
+  /// The tab it opens on: one of the tabs below.
   final int initialTab;
+
+  static const int bikesTab = 0;
+  static const int carsTab = 1;
+  static const int skinsTab = 2;
+  static const int coinsTab = 3;
+  static const int diamondsTab = 4;
 
   @override
   State<ShopScreen> createState() => _ShopScreenState();
@@ -64,7 +70,7 @@ class _ShopScreenState extends State<ShopScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 5,
       initialIndex: widget.initialTab,
       child: ListenableBuilder(
         listenable: Listenable.merge([_progress, _store]),
@@ -91,72 +97,133 @@ class _ShopScreenState extends State<ShopScreen> {
                 ),
               ),
             ],
+            // Five tabs don't fit a narrow phone at full width, so the row
+            // scrolls there.
             bottom: const TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.center,
+              labelPadding: EdgeInsets.symmetric(horizontal: 12),
               indicatorColor: Color(0xFFFF9800),
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white54,
               labelStyle: TextStyle(fontWeight: FontWeight.w900),
               tabs: [
                 Tab(icon: Icon(Icons.two_wheeler), text: 'BIKES'),
+                Tab(icon: Icon(Icons.directions_car), text: 'CARS'),
+                Tab(icon: Icon(Icons.format_paint), text: 'SKINS'),
                 Tab(icon: Icon(Icons.monetization_on), text: 'COINS'),
                 Tab(icon: Icon(Icons.diamond), text: 'DIAMONDS'),
               ],
             ),
           ),
           body: TabBarView(
-            children: [_bikesTab(), _coinsTab(), _diamondsTab()],
+            children: [
+              _ridesTab(Catalog.bikes),
+              _ridesTab(Catalog.cars),
+              _skinsTab(),
+              _coinsTab(),
+              _diamondsTab(),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // ---------------------------------------------------------------- bikes
+  // ---------------------------------------------------------- bikes, cars
 
-  Widget _bikesTab() {
+  /// [rides] wearing the skin picked in the skins tab.
+  Widget _ridesTab(List<Ride> rides) {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: Catalog.bikes.length,
+      itemCount: rides.length,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, i) {
-        final bike = Catalog.bikes[i];
-        final selected = _progress.selected == bike.id;
+        final ride = rides[i];
+        final selected = _progress.selected == ride.id;
         return _Card(
-          highlight: selected ? bike.color : null,
-          leading: Container(
-            width: 64,
-            height: 92,
-            decoration: BoxDecoration(
-              color: const Color(0xFF3D4049),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: CustomPaint(painter: _BikePreviewPainter(bike)),
-          ),
-          title: bike.name,
-          badge: bike.isPremium ? 'PREMIUM' : null,
-          subtitle: bike.perk ?? 'Classic racer',
-          action: _bikeAction(bike),
+          highlight: selected ? ride.labelColor : null,
+          leading: _RidePreview(ride, _progress.selectedSkin),
+          title: ride.name,
+          badge: ride.isPremium ? 'PREMIUM' : null,
+          subtitle: ride.perk ?? 'Classic racer',
+          action: _rideAction(ride),
         );
       },
     );
   }
 
-  Widget _bikeAction(BikeSkin bike) {
-    if (_progress.selected == bike.id) {
+  Widget _rideAction(Ride ride) {
+    if (_progress.selected == ride.id) {
       return const _Tag(label: 'RIDING', color: _green);
     }
-    if (_progress.owns(bike)) {
+    if (_progress.owns(ride)) {
       return FilledButton(
-        onPressed: () => _progress.select(bike),
+        onPressed: () => _progress.select(ride),
         child: const Text('RIDE'),
       );
     }
-    if (bike.isPremium) return _priceButton(bike.productId!);
-    final affordable = _progress.wallet >= bike.coinPrice;
+    if (ride.isPremium) return _priceButton(ride.productId!);
+    return _coinButton(ride.coinPrice,
+        bought: ride.name, buy: () => _progress.buyWithCoins(ride));
+  }
+
+  // ---------------------------------------------------------------- skins
+
+  /// Every skin, shown on the bike or car being ridden.
+  Widget _skinsTab() {
+    final ride = _progress.selectedRide;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            'A skin goes on whichever bike or car you ride. '
+            'Shown here on your ${ride.name}.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white38, fontSize: 12),
+          ),
+        ),
+        for (final skin in Catalog.skins) ...[
+          _Card(
+            highlight: _progress.skinId == skin.id ? _green : null,
+            leading: _RidePreview(ride, skin),
+            title: skin.name,
+            badge: skin.isPremium ? 'PREMIUM' : null,
+            subtitle: skin.description,
+            action: _skinAction(skin),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+
+  Widget _skinAction(Skin skin) {
+    if (_progress.skinId == skin.id) {
+      return const _Tag(label: 'EQUIPPED', color: _green);
+    }
+    if (_progress.hasSkin(skin)) {
+      return FilledButton(
+        onPressed: () => _progress.selectSkin(skin),
+        child: const Text('USE'),
+      );
+    }
+    if (skin.isPremium) return _priceButton(skin.productId!);
+    return _coinButton(skin.coinPrice,
+        bought: '${skin.name} skin', buy: () => _progress.buySkin(skin));
+  }
+
+  /// Buys something for [price] coins with [buy], which returns false when
+  /// the wallet is short. [bought] names it in the message after.
+  Widget _coinButton(int price,
+      {required String bought, required bool Function() buy}) {
+    final affordable = _progress.wallet >= price;
     return FilledButton.icon(
       onPressed: () {
-        if (_progress.buyWithCoins(bike)) {
-          _toast('${bike.name} unlocked!');
+        if (buy()) {
+          _toast('$bought unlocked!');
         } else {
           _toast('Not enough coins. Keep riding or grab a coin pack!');
         }
@@ -167,7 +234,7 @@ class _ShopScreenState extends State<ShopScreen> {
         foregroundColor: Colors.white,
       ),
       icon: const Icon(Icons.monetization_on, color: _gold, size: 18),
-      label: Text(formatNumber(bike.coinPrice)),
+      label: Text(formatNumber(price)),
     );
   }
 
@@ -205,7 +272,7 @@ class _ShopScreenState extends State<ShopScreen> {
             leading: _CoinStack(count: i + 1),
             title: '${formatNumber(Catalog.coinPacks[i].coins)} COINS',
             badge: Catalog.coinPacks[i].badge,
-            subtitle: 'Unlock bikes and continue after crashes',
+            subtitle: 'Unlock rides and skins, continue after crashes',
             action: _priceButton(Catalog.coinPacks[i].productId),
           ),
           const SizedBox(height: 12),
@@ -482,10 +549,34 @@ class _CoinStack extends StatelessWidget {
   }
 }
 
-class _BikePreviewPainter extends CustomPainter {
-  _BikePreviewPainter(this.bike);
+/// A bike or car on a strip of road, wearing [skin].
+class _RidePreview extends StatelessWidget {
+  const _RidePreview(this.ride, this.skin);
 
-  final BikeSkin bike;
+  final Ride ride;
+  final Skin skin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 64,
+      height: 92,
+      // Keeps a premium ride's glow inside the box.
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFF3D4049),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: CustomPaint(painter: _RidePreviewPainter(ride, skin)),
+    );
+  }
+}
+
+class _RidePreviewPainter extends CustomPainter {
+  _RidePreviewPainter(this.ride, this.skin);
+
+  final Ride ride;
+  final Skin skin;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -497,10 +588,11 @@ class _BikePreviewPainter extends CustomPainter {
     canvas.save();
     canvas.translate(size.width / 2, size.height / 2);
     canvas.scale(size.height / 80);
-    paintBike(canvas, bike);
+    paintRide(canvas, ride, skin: skin);
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_BikePreviewPainter old) => old.bike != bike;
+  bool shouldRepaint(_RidePreviewPainter old) =>
+      old.ride != ride || old.skin != skin;
 }

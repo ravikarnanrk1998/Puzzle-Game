@@ -61,6 +61,16 @@ void main() {
       expect(merged.selected, 'sun');
       expect(merged.delivered, ['GPA.1', 'GPA.2']);
     });
+
+    test('a cloud save never takes away skins', () {
+      const cloud = SaveData(skins: {'stock', 'flames'}, skin: 'flames');
+      const local = SaveData(skins: {'stock', 'tiger'}, skin: 'tiger');
+      final merged = cloud.merge(local);
+      expect(merged.skins, {'stock', 'flames', 'tiger'});
+      expect(merged.skin, 'flames', reason: 'the skin worn follows the cloud');
+      expect(const SaveData(skins: {'stock'}).merge(local).skin, 'tiger',
+          reason: 'a cloud save that never picked one keeps the device\'s');
+    });
   });
 
   test('PlayerProgress remembers whose progress is on the device', () async {
@@ -88,6 +98,20 @@ void main() {
     expect(nextLaunch.selectedTrack.id, 'mountain');
   });
 
+  test('PlayerProgress remembers skins, cars and what is in use', () async {
+    SharedPreferences.setMockInitialValues({});
+    final p = await PlayerProgress.load();
+    p
+      ..unlockSkin('tiger')
+      ..selectSkin(Catalog.skin('tiger'))
+      ..unlockRide('hyper')
+      ..select(Catalog.ride('hyper'));
+    final nextLaunch = await PlayerProgress.load();
+    expect(nextLaunch.skins, {'stock', 'tiger'});
+    expect(nextLaunch.selectedSkin.id, 'tiger');
+    expect(nextLaunch.selectedRide.id, 'hyper');
+  });
+
   group('CloudSave', () {
     late FakeSaves server;
     late PlayerProgress phone;
@@ -102,7 +126,7 @@ void main() {
     test('a new account keeps progress made before signing in', () async {
       phone
         ..addCoins(5000)
-        ..buyWithCoins(Catalog.bike('blue'))
+        ..buyWithCoins(Catalog.ride('blue'))
         ..addCoins(120);
       await cloud.attach('ravi');
       expect(phone.owner, 'ravi');
@@ -127,6 +151,22 @@ void main() {
       expect(server.saves['ravi']!.avatar, 'oldMan');
     });
 
+    test('bought skins, and the one worn, follow the account', () async {
+      final flames = Catalog.skin('flames');
+      await cloud.attach('ravi');
+      phone
+        ..addCoins(flames.coinPrice)
+        ..buySkin(flames);
+      await pumpEventQueue();
+      expect(server.saves['ravi']!.skins, {'stock', 'flames'});
+      expect(server.saves['ravi']!.skin, 'flames');
+
+      final tablet = PlayerProgress.memory();
+      await CloudSave(tablet, server).attach('ravi');
+      expect(tablet.selectedSkin, flames);
+      expect(tablet.wallet, 0);
+    });
+
     test('a save comes back on a new phone', () async {
       server.saves['ravi'] = const SaveData(
         wallet: 42000,
@@ -135,9 +175,12 @@ void main() {
         owned: {'red', 'gold'},
         selected: 'gold',
         delivered: ['GPA.1'],
+        skins: {'stock', 'camo'},
+        skin: 'camo',
       );
       await cloud.attach('ravi');
       expect(phone.wallet, 42000);
+      expect(phone.selectedSkin.id, 'camo');
       expect(phone.best, 9000);
       expect(phone.doubleCoins, isTrue);
       expect(phone.selected, 'gold');
@@ -177,13 +220,13 @@ void main() {
       await cloud.attach('ravi');
       phone
         ..addCoins(5000)
-        ..buyWithCoins(Catalog.bike('blue'))
+        ..buyWithCoins(Catalog.ride('blue'))
         ..recordRun(score: 1200, coins: 35);
       await pumpEventQueue();
       cloud.detach();
       expect(phone.wallet, 0);
       expect(phone.best, 0);
-      expect(phone.owns(Catalog.bike('blue')), isFalse);
+      expect(phone.owns(Catalog.ride('blue')), isFalse);
       expect(phone.owner, isNull);
       expect(server.saves['ravi']!.wallet, 35,
           reason: 'signing out must not touch the cloud save');
@@ -229,13 +272,13 @@ void main() {
     test('a bike is not lost to an out-of-date update', () async {
       await cloud.attach('ravi');
       final outOfDate = server.saves['ravi']!;
-      phone.unlockBike('gold');
+      phone.unlockRide('gold');
       await pumpEventQueue();
       expect(server.saves['ravi']!.owned, contains('gold'));
       server.saves['ravi'] = outOfDate;
       server.notify();
       await pumpEventQueue();
-      expect(phone.owns(Catalog.bike('gold')), isTrue);
+      expect(phone.owns(Catalog.ride('gold')), isTrue);
       expect(server.saves['ravi']!.owned, contains('gold'),
           reason: 'the phone sends the bike again');
     });
