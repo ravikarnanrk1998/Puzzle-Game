@@ -1,0 +1,10 @@
+# ninja log v5
+143	6398	8154324127150187	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	391dcf3dbe1fc39f
+79	6416	8154324127257400	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	4c476608d7ac7e60
+2	6443	8154324127700811	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	df066822ad8c1a9b
+170	6487	8154324128154676	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	bc102fb88c500c4b
+25	6670	8154324129972923	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	31c28b373191d254
+207	6977	8154324133103770	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	86cc5cb948bcd638
+116	7081	8154324134143953	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	63630c708ff48a97
+52	7309	8154324136342555	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	525a18da7de8524
+7309	7537	8154324138730567	C:/Users/ravik/flutter soures/Puzzle-Game/KPLCricket2026/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/l735j735/obj/arm64-v8a/libgame.so	9a4243e169b71f80

@@ -21,6 +21,13 @@ namespace FRF
         public float TreeDensity = 1;
         public Weather Weather;
         public bool Lava;
+
+        // Poly Haven photo art (see Assets/FRF/Art/CREDITS.txt). Empty = procedural fallback.
+        public string Sky, TrailTex, DetailTex, RockTex = "rock_boulder_dry";
+        /// <summary>Skybox rotation (degrees) so the photo's best view lies down the course.</summary>
+        public float SkyRotation;
+        public float SkyExposure = 1f;
+        public Color TrailTint = Color.white, RockTint = Color.white;
     }
 
     public sealed class TrackDef
@@ -124,6 +131,7 @@ namespace FRF
             Sun = new Color(1f, 0.95f, 0.86f), AmbSky = new Color(0.6f, 0.7f, 0.86f), AmbEquator = new Color(0.55f, 0.6f, 0.55f), AmbGround = new Color(0.3f, 0.34f, 0.24f),
             MountainNear = Mats.Hex(0x4E6E4A), MountainFar = Mats.Hex(0x7F95A8), MountainCap = Mats.Hex(0xF4F7FA),
             SunElevation = 46, SunAzimuth = 35,
+            Sky = "alps_field", TrailTex = "rocky_trail", DetailTex = "aerial_grass_rock",
         };
 
         public static readonly Theme Canyon = new Theme
@@ -136,6 +144,8 @@ namespace FRF
             Sun = new Color(1f, 0.9f, 0.76f), AmbSky = new Color(0.66f, 0.68f, 0.8f), AmbEquator = new Color(0.72f, 0.58f, 0.46f), AmbGround = new Color(0.45f, 0.3f, 0.2f),
             MountainNear = Mats.Hex(0xA9573A), MountainFar = Mats.Hex(0xC79478), MountainCap = Mats.Hex(0xD9A57C),
             SunElevation = 55, SunAzimuth = -20, TreeDensity = 0.35f, Grip = 0.95f, FogStart = 200, FogEnd = 1700,
+            Sky = "valley_of_desolation", TrailTex = "gravelly_sand", DetailTex = "gravelly_sand",
+            TrailTint = new Color(1f, 0.86f, 0.72f), RockTint = new Color(1f, 0.72f, 0.56f),
         };
 
         public static readonly Theme Autumn = new Theme
@@ -149,6 +159,7 @@ namespace FRF
             MountainNear = Mats.Hex(0x7A5A3A), MountainFar = Mats.Hex(0x9C8A9A), MountainCap = Mats.Hex(0xF3E6DA),
             SunElevation = 27, SunAzimuth = 55, SunIntensity = 1.6f, Exposure = 1.35f, Atmosphere = 1.4f, FogStart = 130, FogEnd = 1200,
             Weather = Weather.Leaves,
+            Sky = "autumn_hill_view", TrailTex = "rocky_trail", DetailTex = "aerial_grass_rock", TrailTint = new Color(1f, 0.93f, 0.84f),
         };
 
         public static readonly Theme Glacier = new Theme
@@ -162,6 +173,7 @@ namespace FRF
             MountainNear = Mats.Hex(0xC8D4E2), MountainFar = Mats.Hex(0x9AAEC6), MountainCap = Mats.Hex(0xFFFFFF),
             SunElevation = 30, SunAzimuth = -40, SunIntensity = 1.35f, Exposure = 1.15f, Grip = 0.8f, TreeDensity = 0.6f, FogStart = 90, FogEnd = 1000,
             Weather = Weather.Snow,
+            Sky = "lago_disola", TrailTex = "snow_02", DetailTex = "snow_02", RockTint = new Color(0.82f, 0.86f, 0.92f),
         };
 
         public static readonly Theme Volcano = new Theme
@@ -176,6 +188,8 @@ namespace FRF
             MountainNear = Mats.Hex(0x3A302C), MountainFar = Mats.Hex(0x6A4A40), MountainCap = Mats.Hex(0x9A5A3A),
             SunElevation = 24, SunAzimuth = -60, SunIntensity = 1.6f, Exposure = 1.3f, Atmosphere = 1.3f, FogStart = 90, FogEnd = 1000,
             TreeDensity = 0.3f, Weather = Weather.Ash, Lava = true,
+            Sky = "klippad_sunrise_2", TrailTex = "rock_ground", DetailTex = "rock_ground",
+            TrailTint = new Color(0.5f, 0.44f, 0.42f), RockTint = new Color(0.38f, 0.34f, 0.33f),
         };
 
         public static readonly TrackDef[] Tracks =

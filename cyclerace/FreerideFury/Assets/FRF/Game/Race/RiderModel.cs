@@ -75,7 +75,7 @@ namespace FRF
             var b = new MeshBuilder();
             var tire = Mats.Hex(0x1A1A1C);
             const int seg = 18;
-            const float ro = WheelR, ri = WheelR - 0.06f, hw = 0.035f, rr = ri - 0.025f;
+            const float ro = WheelR - 0.012f, ri = WheelR - 0.068f, hw = 0.046f, rr = ri - 0.022f;
             for (int i = 0; i < seg; i++)
             {
                 float a0 = i / (float)seg * Mathf.PI * 2, a1 = (i + 1) / (float)seg * Mathf.PI * 2;
@@ -91,6 +91,17 @@ namespace FRF
                     b.FlatQuad(P(rr, a0, x * 0.6f), P(ri, a0, x * 0.8f), P(ri, a1, x * 0.8f), P(rr, a1, x * 0.6f), ru, inside);
                 }
             }
+            // Knobby tread: two staggered rows of blocks around the tyre.
+            var knob = Mats.Hex(0x121214);
+            for (int i = 0; i < 28; i++)
+            {
+                float a = i / 28f * Mathf.PI * 2;
+                float x = i % 2 == 0 ? -0.022f : 0.022f;
+                var dir = new Vector3(0, Mathf.Sin(a), Mathf.Cos(a));
+                b.Xf = Matrix4x4.TRS(dir * (ro + 0.006f) + new Vector3(x, 0, 0), Quaternion.LookRotation(Vector3.Cross(Vector3.right, dir), dir), Vector3.one);
+                b.Box(Vector3.zero, new Vector3(0.017f, 0.009f, 0.013f), knob);
+            }
+            b.Xf = Matrix4x4.identity;
             var spoke = Mats.Hex(0xC9CED6);
             for (int k = 0; k < 12; k++)
             {

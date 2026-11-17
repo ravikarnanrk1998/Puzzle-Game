@@ -563,7 +563,7 @@ namespace FRF
             var r = Player;
             var tr = Track;
             bool far = Settings.FarCamera;
-            float back = far ? 6.4f : 4.4f, up = far ? 2.7f : 1.95f;
+            float back = far ? 6.4f : 4.5f, up = far ? 2.5f : 1.75f;
             Vector3 target, look;
             if (Phase == RacePhase.Countdown && Countdown > 1.4f)
             {
@@ -599,8 +599,9 @@ namespace FRF
                 float y = Mathf.Max(gy + up, r.Y + up * 0.75f);
                 if (!r.Grounded) y = Mathf.Max(y, r.Y + up * 0.55f);
                 target = tr.World(s, x, y);
-                look = r.WorldPos + Vector3.up * 0.95f + tr.Forward(r.S + 4) * 6f;
-                look.y = Mathf.Lerp(look.y, r.Y + 0.9f, 0.6f);
+                // Looking a little higher keeps the rider above the speed gauge at the bottom of the screen.
+                look = r.WorldPos + Vector3.up * 1.2f + tr.Forward(r.S + 4) * 5f;
+                look.y = Mathf.Lerp(look.y, r.Y + 1.25f, 0.6f);
             }
             if (snap)
             {

@@ -20,8 +20,8 @@ namespace FRF.EditorTools
         public const string ProductName = "Freeride Fury";
         public const string CompanyName = "RK Game";
         public const string PackageId = "com.rkgame.freeridefury";
-        public const string Version = "1.0.1";
-        public const int VersionCode = 2;
+        public const string Version = "1.0.2";
+        public const int VersionCode = 3;
         const string SigningFile = "Signing/keystore.properties";
         const string MatDir = "Assets/FRF/Resources/Materials";
         const string SceneDir = "Assets/FRF/Scenes";
@@ -34,6 +34,7 @@ namespace FRF.EditorTools
         public static void Setup()
         {
             EnsureUrpAsset();
+            ArtImport.ImportArt();
             CreateMaterials();
             CreateBootScene();
             CreateIcon();
@@ -152,6 +153,27 @@ namespace FRF.EditorTools
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
+        static Texture2D FlatNormal()
+        {
+            string path = MatDir + "/FlatNormal.png";
+            if (!File.Exists(path))
+            {
+                Directory.CreateDirectory(MatDir);
+                var t = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+                var px = new Color32[16];
+                for (int i = 0; i < 16; i++) px[i] = new Color32(128, 128, 255, 255);
+                t.SetPixels32(px);
+                t.Apply();
+                File.WriteAllBytes(path, t.EncodeToPNG());
+                UnityEngine.Object.DestroyImmediate(t);
+                AssetDatabase.ImportAsset(path);
+                var ti = (TextureImporter)AssetImporter.GetAtPath(path);
+                ti.textureType = TextureImporterType.NormalMap;
+                ti.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
         public static void CreateMaterials()
         {
             var lit = Find("Universal Render Pipeline/Lit");
@@ -178,6 +200,20 @@ namespace FRF.EditorTools
             m.SetFloat("_DetailAlbedoMapScale", 1);
             m.EnableKeyword("_DETAIL_MULX2");
             Save(m, "FRF_LitDetail");
+
+            // Photo surfaces with normal maps (trail, rocks); the flat normal keeps the keyword valid.
+            m = new Material(lit) { name = "FRF_LitNormal" };
+            m.SetFloat("_Smoothness", 0.15f);
+            m.SetTexture("_BumpMap", FlatNormal());
+            m.SetFloat("_BumpScale", 1);
+            m.EnableKeyword("_NORMALMAP");
+            Save(m, "FRF_LitNormal");
+
+            // Photo sky: equirectangular panorama.
+            m = new Material(Find("Skybox/Panoramic")) { name = "FRF_SkyPano" };
+            m.SetFloat("_Mapping", 1);
+            m.SetFloat("_ImageType", 0);
+            Save(m, "FRF_SkyPano");
 
             m = new Material(lit) { name = "FRF_LitCutout" };
             m.SetFloat("_AlphaClip", 1);
@@ -209,6 +245,10 @@ namespace FRF.EditorTools
 
             m = new Material(Find("Skybox/Procedural")) { name = "FRF_Sky" };
             Save(m, "FRF_Sky");
+
+            // Cloud layer shader (Assets/FRF/Shaders); the Resources material keeps it in builds.
+            m = new Material(Find("FRF/SkyClouds")) { name = "FRF_Clouds" };
+            Save(m, "FRF_Clouds");
             AssetDatabase.SaveAssets();
         }
 

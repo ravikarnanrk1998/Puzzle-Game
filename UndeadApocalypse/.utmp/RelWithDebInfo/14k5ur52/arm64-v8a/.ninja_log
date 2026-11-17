@@ -1,0 +1,19 @@
+# ninja log v5
+92	13545	8164412409835740	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	fe9e40ff9693c5b1
+160	13552	8164412409835740	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	818c065ebefa3ee8
+149	13566	8164412410153203	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	c171bfbcc66380bc
+112	13581	8164412410316639	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	a12430f02da17b0f
+73	13549	8164412409938086	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	eab183dc4cd380fb
+128	13867	8164412413158936	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	51273423a117d8fa
+139	13818	8164412412689416	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	759863b5010cb515
+52	13940	8164412413818961	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	51af30bc13fe8617
+13941	14342	8164412417954533	C:/Users/ravik/flutter soures/Puzzle-Game/UndeadApocalypse/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/14k5ur52/obj/arm64-v8a/libgame.so	b795c0c46d4d6728
+110	2295	8165420195764870	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	818c065ebefa3ee8
+30	2306	8165420195831124	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	fe9e40ff9693c5b1
+42	2352	8165420196285000	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	eab183dc4cd380fb
+121	2372	8165420196477360	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	c171bfbcc66380bc
+67	2433	8165420196984508	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	a12430f02da17b0f
+96	2600	8165420198778331	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	51273423a117d8fa
+83	2667	8165420199477707	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	759863b5010cb515
+21	2805	8165420200823537	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	51af30bc13fe8617
+2805	3029	8165420203123521	C:/Users/ravik/flutter soures/Puzzle-Game/UndeadApocalypse/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/14k5ur52/obj/arm64-v8a/libgame.so	b795c0c46d4d6728

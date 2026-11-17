@@ -1,0 +1,5 @@
+C:/Users/ravik/flutter soures/Puzzle-Game/KPLCricket2026/.utmp/RelWithDebInfo/l735j735/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/ravik/flutter soures/Puzzle-Game/KPLCricket2026/.utmp/RelWithDebInfo/l735j735/arm64-v8a/CMakeFiles/rebuild_cache.dir
+C:/Users/ravik/flutter soures/Puzzle-Game/KPLCricket2026/.utmp/RelWithDebInfo/l735j735/arm64-v8a/GameActivity/CMakeFiles/game.dir
+C:/Users/ravik/flutter soures/Puzzle-Game/KPLCricket2026/.utmp/RelWithDebInfo/l735j735/arm64-v8a/GameActivity/CMakeFiles/edit_cache.dir
+C:/Users/ravik/flutter soures/Puzzle-Game/KPLCricket2026/.utmp/RelWithDebInfo/l735j735/arm64-v8a/GameActivity/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Undead Apocalypse Privacy Policy</title>
+<meta name="description" content="Privacy policy for Undead Apocalypse: Infinite War, an Android game by RK Games.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=Saira+Stencil+One&display=swap">
+<style>
+  /* Layout: a dark title band with a hazard stripe, then one reading column (~68ch): a set-off summary, then numbered sections. */
+  :root {
+    --bg: #F4F5F7;
+    --surface: #FFFFFF;
+    --fg: #16191E;
+    --muted: #59606B;
+    --line: #DCE0E5;
+    --accent: #B0141A;
+    --band: #121519;
+    --band-fg: #F1F2F4;
+    --band-muted: #A9B0B9;
+    --hazard: #F2B705;
+    --hazard-dark: #16191E;
+    --display: "Saira Stencil One", "Arial Black", Impact, sans-serif;
+    --body: "Barlow", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --label: "Barlow Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E1115; --surface: #161A20; --fg: #E5E7EA; --muted: #9AA2AC; --line: #282E36;
+      --accent: #FF6157; --band: #07090B; --band-fg: #F1F2F4; --band-muted: #9AA2AC;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1115; --surface: #161A20; --fg: #E5E7EA; --muted: #9AA2AC; --line: #282E36;
+    --accent: #FF6157; --band: #07090B; --band-fg: #F1F2F4; --band-muted: #9AA2AC;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+  }
+  .wrap {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .band { background: var(--band); color: var(--band-fg); }
+  .band .wrap { padding-block: 2.75rem 2.25rem; display: grid; gap: 0.35rem; }
+  .eyebrow, .meta, h2, .label, th {
+    font-family: var(--label);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .eyebrow { margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--hazard); }
+  h1 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(2.3rem, 7vw, 3.4rem);
+    line-height: 1.05;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+  .game { margin: 0.25rem 0 0; font-size: 1.15rem; font-weight: 600; }
+  .meta { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--band-muted); }
+  .hazard {
+    height: 8px;
+    background: repeating-linear-gradient(-45deg, var(--hazard) 0 14px, var(--hazard-dark) 14px 28px);
+  }
+
+  main.wrap { padding-block: 2.5rem 1rem; display: grid; gap: 2.25rem; }
+  section { display: grid; gap: 0.75rem; min-width: 0; }
+  h2 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.2;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    text-wrap: balance;
+  }
+  h2 .n { color: var(--accent); font-variant-numeric: tabular-nums; min-width: 1.4em; }
+  p, ul { margin: 0; }
+  ul { padding-left: 1.2rem; display: grid; gap: 0.4rem; }
+  a { color: var(--accent); text-underline-offset: 0.18em; }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+  strong { font-weight: 600; }
+
+  .short {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--accent);
+    border-radius: 6px;
+    padding: 1.4rem 1.5rem;
+  }
+  .short ul { list-style: none; padding: 0; gap: 0.55rem; }
+  .short li { padding-left: 1.4rem; position: relative; }
+  .short li::before {
+    content: "";
+    position: absolute; left: 0; top: 0.62em;
+    width: 0.55rem; height: 0.55rem;
+    background: var(--accent);
+    transform: rotate(45deg);
+  }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.98rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: 0; }
+  th { font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+
+  .contact {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.2rem;
+  }
+  .label { font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+  .contact a { font-weight: 600; word-break: break-all; }
+  button {
+    font: 600 0.9rem var(--label);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fg);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0.3rem 0.75rem;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+
+  footer.wrap { padding-block: 2rem 3rem; color: var(--muted); font-size: 0.95rem; }
+  footer p { border-top: 1px solid var(--line); padding-top: 1.25rem; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="band">
+  <div class="wrap">
+    <p class="eyebrow">RK Games</p>
+    <h1>Privacy Policy</h1>
+    <p class="game">Undead Apocalypse: Infinite War (Android)</p>
+    <p class="meta">Last updated 9 November 2026</p>
+  </div>
+</header>
+<div class="hazard" aria-hidden="true"></div>
+
+<main class="wrap">
+  <section class="short" aria-labelledby="short-h">
+    <h2 id="short-h">In short</h2>
+    <ul>
+      <li>We don't collect, store, sell or share your personal information.</li>
+      <li>There is no account or sign-in. Your game progress is saved only on your device.</li>
+      <li>The game shows no ads and doesn't use your device's advertising ID.</li>
+      <li>In-app purchases are handled by Google Play. We never see your payment details.</li>
+      <li>The Game is built with Unity. Unity's in-app purchase library sends Unity some technical data, such as device identifiers, approximate location, purchase history and crash and performance data. Unity uses it to process purchases and for analytics, under Unity's own privacy policy (see section 6).</li>
+    </ul>
+  </section>
+
+  <section id="who" aria-labelledby="who-h">
+    <h2 id="who-h"><span class="n">1</span>Who we are</h2>
+    <p>Undead Apocalypse: Infinite War (the "Game") is made by RK Games ("we", "us"). It is published on Google Play under the package name <strong>com.rkgame.undeadapocalypse</strong>. This policy explains what happens to information when you play the Game. You can contact us at any time using the details in section 13.</p>
+  </section>
+
+  <section id="collect" aria-labelledby="collect-h">
+    <h2 id="collect-h"><span class="n">2</span>Information we collect</h2>
+    <p>RK Games does not collect personal information through the Game. The Game has no registration or account system. It doesn't ask for or access your name, email address, phone number, contacts, photos, files, camera, microphone or device location. We don't run any server that receives data from the Game.</p>
+    <p>The only data that leaves your device goes to Google Play, which handles purchases, and to Unity, whose in-app purchase library is built into the Game. Sections 4 and 6 describe this.</p>
+  </section>
+
+  <section id="device" aria-labelledby="device-h">
+    <h2 id="device-h"><span class="n">3</span>Information stored on your device</h2>
+    <p>So that you can keep playing where you left off, the Game saves the following in its private storage on your device:</p>
+    <ul>
+      <li>game progress, such as levels, stages, missions, unlocked weapons and characters, coins and gems;</li>
+      <li>your settings, such as graphics quality, controls, sound and vibration;</li>
+      <li>daily reward and mission timers;</li>
+      <li>a record of purchases you have made, so that bought items stay unlocked.</li>
+    </ul>
+    <p>This data stays on your device. It is not sent to us or to anyone else. When the Game is installed for the first time, it also reads your device's identifier once, on the device, as one ingredient of a random number that shapes the game world. The identifier itself is not saved or sent anywhere.</p>
+    <p>You can delete all of this data at any time by uninstalling the Game, or in Android Settings &gt; Apps &gt; Undead Apocalypse &gt; Storage &gt; Clear storage. This also deletes your progress, and we can't restore it because we don't hold a copy. Permanent unlocks you paid for can be restored with Restore Purchases in the Game's store. Items that were used up, such as coins and gems, can't be restored.</p>
+  </section>
+
+  <section id="purchases" aria-labelledby="purchases-h">
+    <h2 id="purchases-h"><span class="n">4</span>In-app purchases</h2>
+    <p>The Game offers optional purchases for real money. These are processed by Google Play Billing under Google's own terms and privacy policy. We don't receive your card number, bank details, billing address or other payment information.</p>
+    <p>When you buy something, Google Play gives the Game a purchase receipt that names the item and includes an order number and a purchase token. The Game checks this receipt on your device and then delivers the item. It keeps only a shortened, one-way coded reference to the transaction, so the same purchase is never delivered twice. The receipt is not sent to us.</p>
+    <p>Google Play may give us reports about purchases made in the Game, such as the order number, item, price, date and country. We use these reports only for accounting, refunds, customer support and fraud prevention.</p>
+  </section>
+
+  <section id="ads" aria-labelledby="ads-h">
+    <h2 id="ads-h"><span class="n">5</span>Advertising</h2>
+    <p>The Game does not show advertising and does not use your device's advertising ID. If a future version adds optional ads, we will update this policy before that version is released and ask for any consent the law requires.</p>
+  </section>
+
+  <section id="third" aria-labelledby="third-h">
+    <h2 id="third-h"><span class="n">6</span>Third-party services</h2>
+    <p>The Game relies on two outside companies. Each handles information under its own privacy policy.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th scope="col">Service</th><th scope="col">What it does and what it may collect</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Google Play</td>
+            <td>Distributes the Game and processes in-app purchases. Google handles your Google account and payment information. <a href="https://policies.google.com/privacy" rel="noopener" target="_blank">Google Privacy Policy</a></td>
+          </tr>
+          <tr>
+            <td>Unity</td>
+            <td>Unity Technologies makes the game engine and the in-app purchase library (Unity IAP) the Game is built with. According to Unity's published disclosures, Unity IAP collects device and other identifiers, a user identifier, approximate location (processed only briefly, for example from your IP address), purchase history, crash logs, diagnostics and other app performance data. Unity uses this data to process purchases and for analytics. It is encrypted in transit and not shared with other companies. The engine may also report basic device information, such as device model, operating system version and hardware specifications. <a href="https://unity.com/legal/privacy-policy" rel="noopener" target="_blank">Unity Privacy Policy</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="permissions" aria-labelledby="permissions-h">
+    <h2 id="permissions-h"><span class="n">7</span>Device permissions</h2>
+    <ul>
+      <li><strong>Internet and network state:</strong> to connect to Google Play and Unity for purchases. You can play the Game offline.</li>
+      <li><strong>Google Play Billing:</strong> to make in-app purchases.</li>
+      <li><strong>Vibration:</strong> for haptic feedback during play. You can turn it off in the Game's Settings.</li>
+    </ul>
+    <p>The Game does not request access to your location, contacts, camera, microphone, photos or files.</p>
+  </section>
+
+  <section id="children" aria-labelledby="children-h">
+    <h2 id="children-h"><span class="n">8</span>Children</h2>
+    <p>The Game contains fantasy violence (fighting zombies with firearms) and is intended for teenagers and adults. It is not directed to children under 13. We don't knowingly collect personal information from anyone, including children. If you believe a child has sent us personal information, for example by email, contact us and we will delete it.</p>
+  </section>
+
+  <section id="email" aria-labelledby="email-h">
+    <h2 id="email-h"><span class="n">9</span>If you email us</h2>
+    <p>If you contact us by email, we use your email address and message only to reply to you. We delete them when they are no longer needed for that purpose, and we never add you to a mailing list.</p>
+  </section>
+
+  <section id="security" aria-labelledby="security-h">
+    <h2 id="security-h"><span class="n">10</span>Security</h2>
+    <p>Game data is kept in the Game's private storage, which other apps can't read. Data the Game sends to Google Play and Unity is encrypted in transit. No method of storage or transmission is completely secure, but we keep the Game's data handling to the minimum needed to play.</p>
+  </section>
+
+  <section id="rights" aria-labelledby="rights-h">
+    <h2 id="rights-h"><span class="n">11</span>Your rights</h2>
+    <p>Depending on where you live, laws such as the EU and UK General Data Protection Regulation, the California Consumer Privacy Act and India's Digital Personal Data Protection Act, 2023 may give you rights to access, correct or delete your personal data. Because we don't hold personal data from the Game, there is normally nothing for us to provide or delete. The data on your device is under your control (see section 3). For data held by Google or Unity, use their privacy tools. You can always contact us with a privacy question or complaint.</p>
+  </section>
+
+  <section id="changes" aria-labelledby="changes-h">
+    <h2 id="changes-h"><span class="n">12</span>Changes to this policy</h2>
+    <p>We may update this policy, for example when the Game gains new features. We will change the "Last updated" date above. If a change affects how information is handled, we will also mention it in the Game's store listing or in the Game before the change takes effect.</p>
+  </section>
+
+  <section id="contact" aria-labelledby="contact-h">
+    <h2 id="contact-h"><span class="n">13</span>Contact us</h2>
+    <p>For questions about this policy or your data, contact RK Games:</p>
+    <div class="contact">
+      <span class="label">Email</span>
+      <a href="mailto:ravikarnanrk1998@gmail.com" id="email-address">ravikarnanrk1998@gmail.com</a>
+      <button type="button" id="copy-email">Copy</button>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>&copy; 2026 RK Games. Undead Apocalypse: Infinite War.</p>
+</footer>
+
+<script>
+  (function () {
+    var btn = document.getElementById("copy-email");
+    var link = document.getElementById("email-address");
+    if (!btn || !link) return;
+    btn.addEventListener("click", function () {
+      var text = link.textContent.trim();
+      function selectIt() {
+        var r = document.createRange();
+        r.selectNodeContents(link);
+        var s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+        btn.textContent = "Selected";
+      }
+      try {
+        navigator.clipboard.writeText(text).then(function () { btn.textContent = "Copied"; }, selectIt);
+      } catch (e) { selectIt(); }
+      setTimeout(function () { btn.textContent = "Copy"; }, 2000);
+    });
+  })();
+</script>
+
+</body>
+</html>

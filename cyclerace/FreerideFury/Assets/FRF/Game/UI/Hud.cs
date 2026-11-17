@@ -9,7 +9,7 @@ namespace FRF
     {
         RaceDirector _d;
         RectTransform _root, _overlay;
-        Text _place, _placeOf, _time, _speed, _goal, _bigText, _bigSub, _trickName, _trickPts, _boostCount;
+        Text _place, _placeOf, _time, _speed, _tricksText, _tdText, _bigText, _bigSub, _trickName, _trickPts, _boostCount;
         Image _health, _flash, _progress, _gaugeFill, _adrRing, _tiltDot;
         readonly List<Image> _dots = new List<Image>();
         RectTransform _bar, _big, _trick, _intro, _boostRing, _boostBadge, _tilt, _tiltTrack;
@@ -21,6 +21,12 @@ namespace FRF
         static readonly Color Glass     = new Color(0.02f, 0.03f, 0.07f, 0.70f);
         // Slightly lighter for bordered panels
         static readonly Color GlassBord = new Color(0.03f, 0.04f, 0.09f, 0.72f);
+
+        // Action button colours.
+        static readonly Color JumpCol = new Color(1f, 0.5f, 0.07f);
+        static readonly Color PunchCol = new Color(0.88f, 0.12f, 0.2f);
+        static readonly Color BoostCol = new Color(0.09f, 0.43f, 0.85f);
+        static readonly Color BrakeCol = new Color(0.21f, 0.23f, 0.27f);
 
         float _bigT, _bigDur, _trickT, _flashT;
         bool _air;
@@ -71,69 +77,58 @@ namespace FRF
             _flash.preserveAspect = false;
             _flash.rectTransform.Fill();
 
-            // ---- POSITION PANEL (top-left) ----------------------------------
-            // Slanted glass chip
-            var posBg = Ui.Img(r, Ui.Slant, GlassBord, "PosPanel");
-            posBg.type = Image.Type.Sliced;
-            posBg.preserveAspect = false;
-            posBg.rectTransform.At(0, 1, -30, -6, 248, 64);
-
-            // Orange neon underline
-            var posBar = Ui.Img(r, Ui.Round(2), Pal.Orange, "PosBar");
-            posBar.type = Image.Type.Sliced;
-            posBar.preserveAspect = false;
-            posBar.rectTransform.At(0, 1, 0, -68, 208, 3);
-
-            // Neon glow behind the bar
-            var posBarGlow = Ui.Img(r, Ui.NeonGlow, Pal.Orange.WithA(0.35f), "PosBarGlow");
-            posBarGlow.preserveAspect = false;
-            posBarGlow.rectTransform.At(0, 1, 0, -70, 200, 14);
-
-            _place = Ui.Label(r, "1ST", 58, Color.white, TextAnchor.MiddleLeft, true, "Place");
-            _place.rectTransform.At(0, 1, 14, -4, 160, 64);
-            Ui.Shadow(_place, 2.5f, 0.7f);
-            _placeOf = Ui.Label(r, "/6", 24, Pal.Dim, TextAnchor.MiddleLeft, true, "PlaceOf");
+            // ---- POSITION BADGE (top-left) ----------------------------------
+            var posBg = Ui.Panel(r, GlassBord, 12, "PosPanel", Color.white.WithA(0.22f));
+            posBg.raycastTarget = false;
+            posBg.rectTransform.At(0, 1, 8, -6, 186, 58);
+            _place = Ui.Label(r, "1ST", 56, Pal.Gold, TextAnchor.MiddleLeft, true, "Place");
+            _place.rectTransform.At(0, 1, 22, -4, 150, 62);
+            Ui.Outline(_place, new Color(0.25f, 0.12f, 0, 0.85f), 2);
+            _placeOf = Ui.Label(r, "/6", 24, Color.white, TextAnchor.MiddleLeft, true, "PlaceOf");
             _placeOf.rectTransform.At(0, 1, 106, -16, 64, 34);
 
-            // Goal pill
-            var goalBg = Ui.Panel(r, Glass, 10, "GoalPill");
-            goalBg.raycastTarget = false;
-            goalBg.rectTransform.At(0, 1, 8, -76, 310, 24);
-            _goal = Ui.Label(goalBg.transform, "", 15, Pal.Text, TextAnchor.MiddleLeft, false, "Goal");
-            _goal.rectTransform.Fill(10, 0, 8, 0);
+            // Stats pill: star + tricks, skull + takedowns.
+            var statBg = Ui.Panel(r, Glass, 12, "StatsPill", Color.white.WithA(0.14f));
+            statBg.raycastTarget = false;
+            statBg.rectTransform.At(0, 1, 8, -70, 318, 28);
+            var star = Ui.Img(statBg.transform, Icons.Star, Pal.Gold, "Star");
+            star.rectTransform.At(0, 0.5f, 10, 0, 18, 18);
+            _tricksText = Ui.Label(statBg.transform, "TRICKS 0", 15, Pal.Text, TextAnchor.MiddleLeft, true, "Tricks");
+            _tricksText.rectTransform.At(0, 0.5f, 32, 0, 130, 24);
+            var skull = Ui.Img(statBg.transform, Icons.Skull, Color.white, "Skull");
+            skull.rectTransform.At(0, 0.5f, 160, 0, 18, 18);
+            _tdText = Ui.Label(statBg.transform, "TAKEDOWNS 0", 15, Pal.Text, TextAnchor.MiddleLeft, true, "Takedowns");
+            _tdText.rectTransform.At(0, 0.5f, 182, 0, 136, 24);
 
             // ---- TIMER & PROGRESS BAR (top-centre) -------------------------
             var timeBg = Ui.Panel(r, GlassBord, 18, "TimePill", Color.white.WithA(0.18f));
             timeBg.raycastTarget = false;
-            timeBg.rectTransform.At(0.5f, 1, 0, -6, 164, 38);
+            timeBg.rectTransform.At(0.5f, 1, 0, -6, 184, 38);
+            var watch = Ui.Img(timeBg.transform, Icons.Stopwatch, Color.white, "Watch");
+            watch.rectTransform.At(0, 0.5f, 16, 1, 24, 24);
             _time = Ui.Label(timeBg.transform, "0:00.00", 29, Color.white, TextAnchor.MiddleCenter, true, "Time");
-            _time.rectTransform.Fill();
+            _time.rectTransform.Fill(34, 0, 6, 0);
             Ui.Shadow(_time, 2, 0.7f);
 
-            // Course progress bar
-            var barBg = Ui.Panel(r, new Color(0, 0, 0, 0.55f), 5, "Progress", Color.white.WithA(0.20f));
+            // Course progress: a slim line, the player's orange dot and a chequered flag.
+            var barBg = Ui.Panel(r, new Color(0.85f, 0.88f, 0.95f, 0.55f), 3, "Progress");
             barBg.raycastTarget = false;
             _bar = barBg.rectTransform;
-            _bar.At(0.5f, 1, -10, -54, 392, 10);
+            _bar.At(0.5f, 1, -10, -60, 392, 5);
 
-            _progress = Ui.Img(_bar, Ui.Round(4), Pal.Orange, "Fill");
+            _progress = Ui.Img(_bar, Ui.Round(2), Pal.Orange.WithA(0.85f), "Fill");
             _progress.type = Image.Type.Sliced;
             _progress.preserveAspect = false;
-            _progress.rectTransform.Fill(1.5f, 1.5f, 1.5f, 1.5f);
-
-            // Progress glow
-            var progGlow = Ui.Img(_bar, Ui.NeonGlow, Pal.Orange.WithA(0.30f), "FillGlow");
-            progGlow.preserveAspect = false;
-            progGlow.rectTransform.Fill(-4, -6, -4, -6);
+            _progress.rectTransform.Fill();
 
             var flag = Ui.Img(_bar, Icons.Flag, Color.white, "Flag");
-            flag.rectTransform.At(1, 0.5f, 28, 4, 28, 28);
+            flag.rectTransform.At(1, 0.5f, 26, 6, 30, 30);
 
-            // Rider dots on the progress bar
+            // Rider dots on the progress line (rivals small, the player large).
             foreach (var rider in _d.Riders)
             {
                 var dot = Ui.Img(_bar, Ui.Circle, rider.Def.Jersey, "Dot");
-                float size = rider.IsPlayer ? 20 : 12;
+                float size = rider.IsPlayer ? 20 : 9;
                 dot.rectTransform.At(0, 0.5f, 0, 0, size, size);
                 var ring = Ui.Img(dot.transform, Ui.Ring, rider.IsPlayer ? Color.white : new Color(0, 0, 0, 0.55f), "Ring");
                 ring.rectTransform.Fill(-2, -2, -2, -2);
@@ -157,43 +152,40 @@ namespace FRF
             Ui.Tap(pause, () => ShowPause());
 
             // ---- SPEED GAUGE (bottom-centre) --------------------------------
+            // Speedometer: dark dial, green-to-red gradient arc filling with speed.
             var g = Ui.Node(r, "Gauge");
-            g.At(0.5f, 0, 0, 14, 132, 132);
-
-            // Outer glow ring
-            var gaugeGlow = Ui.Img(g, Ui.Circle, Pal.Green.WithA(0.08f), "GaugeGlow");
-            gaugeGlow.preserveAspect = true;
-            gaugeGlow.rectTransform.Fill(-8, -8, -8, -8);
-
-            var disk = Ui.Img(g, Ui.Circle, new Color(0.01f, 0.02f, 0.05f, 0.65f), "Disk");
-            disk.rectTransform.Fill(7, 7, 7, 7);
-
-            var arcBg = Ui.Img(g, Icons.Ring(0.80f), Color.white.WithA(0.12f), "ArcBg");
+            g.At(0.5f, 0, 0, 34, 126, 126);
+            var disk = Ui.Img(g, Ui.Circle, new Color(0.02f, 0.03f, 0.06f, 0.82f), "Disk");
+            disk.rectTransform.Fill(4, 4, 4, 4);
+            var rim = Ui.Img(g, Icons.Ring(0.95f), Color.white.WithA(0.18f), "Rim");
+            rim.rectTransform.Fill();
+            var arcBg = Ui.Img(g, Icons.GaugeRing, Color.white.WithA(0.22f), "ArcBg");
             Arc(arcBg, 0.75f);
-
-            _gaugeFill = Ui.Img(g, Icons.Ring(0.80f), Pal.Green, "Arc");
+            arcBg.rectTransform.Fill(7, 7, 7, 7);
+            _gaugeFill = Ui.Img(g, Icons.GaugeRing, Color.white, "Arc");
             Arc(_gaugeFill, 0);
+            _gaugeFill.rectTransform.Fill(7, 7, 7, 7);
 
-            _speed = Ui.Label(g, "0", 42, Color.white, TextAnchor.MiddleCenter, true, "Speed");
-            _speed.rectTransform.At(0.5f, 0.5f, 0, 10, 120, 46);
+            _speed = Ui.Label(g, "0", 44, Color.white, TextAnchor.MiddleCenter, true, "Speed");
+            _speed.rectTransform.At(0.5f, 0.5f, 0, 8, 120, 48);
             Ui.Shadow(_speed, 2.5f, 0.7f);
+            var kmh = Ui.Label(g, "KM/H", 13, Pal.Dim, TextAnchor.MiddleCenter, true, "Kmh");
+            kmh.rectTransform.At(0.5f, 0.5f, 0, -18, 80, 14);
 
-            var kmh = Ui.Label(g, "KM/H", 12, Pal.Dim, TextAnchor.MiddleCenter, true, "Kmh");
-            kmh.rectTransform.At(0.5f, 0.5f, 0, -14, 80, 14);
-
-            // Balance bar inside gauge
-            var hpBg = Ui.Img(g, Ui.Round(3), new Color(0, 0, 0, 0.65f), "BalanceBg");
+            // Balance pill under the dial.
+            var balBg = Ui.Panel(r, GlassBord, 10, "BalancePill", Color.white.WithA(0.16f));
+            balBg.raycastTarget = false;
+            balBg.rectTransform.At(0.5f, 0, 0, 4, 156, 28);
+            var hl = Ui.Label(balBg.transform, "BALANCE", 11, Color.white, TextAnchor.UpperCenter, true, "Label");
+            hl.rectTransform.Fill(0, 2, 0, 0);
+            var hpBg = Ui.Img(balBg.transform, Ui.Round(3), new Color(0, 0, 0, 0.6f), "BarBg");
             hpBg.type = Image.Type.Sliced;
             hpBg.preserveAspect = false;
-            hpBg.rectTransform.At(0.5f, 0.5f, 0, -34, 64, 8);
-
+            hpBg.rectTransform.At(0.5f, 0, 0, 5, 128, 6);
             _health = Ui.Img(hpBg.transform, Ui.Round(3), Pal.Green, "Balance");
             _health.type = Image.Type.Sliced;
             _health.preserveAspect = false;
             _health.rectTransform.Fill();
-
-            var hl = Ui.Label(r, "BALANCE", 10, Pal.Mute, TextAnchor.MiddleCenter, false, "BalanceLabel");
-            hl.rectTransform.At(0.5f, 0, 0, 2, 120, 11);
 
             // ---- STEERING (bottom-left) ------------------------------------
             _pad = SteerPad.Create(r, 280, 126);
@@ -215,13 +207,13 @@ namespace FRF
 
             // ---- ACTION BUTTONS (bottom-right) ------------------------------
             // JUMP (largest)
-            _btnB = HoldButton.Create(r, "JUMP",  Pal.Orange,                             126, Icons.Jump);
+            _btnB = HoldButton.Create(r, "JUMP",  JumpCol,  126, Icons.Jump);
             ((RectTransform)_btnB.transform).At(1, 0, -14, 14, 126, 126);
             // PUNCH
-            _btnA = HoldButton.Create(r, "PUNCH", Pal.Red,                                100, Icons.Punch);
+            _btnA = HoldButton.Create(r, "PUNCH", PunchCol, 100, Icons.Punch);
             ((RectTransform)_btnA.transform).At(1, 0, -154, 12, 100, 100);
             // BRAKE
-            _btnC = HoldButton.Create(r, "BRAKE", new Color(0.30f, 0.34f, 0.45f),          84, Icons.Brake);
+            _btnC = HoldButton.Create(r, "BRAKE", BrakeCol, 84, Icons.BrakeDisc);
             ((RectTransform)_btnC.transform).At(1, 0, -32, 154, 84, 84);
 
             // Adrenaline ring behind BOOST
@@ -244,7 +236,7 @@ namespace FRF
                 tick.rectTransform.localRotation = Quaternion.Euler(0, 0, -i * 90);
             }
 
-            _btnBoost = HoldButton.Create(r, "BOOST", Pal.CyanDeep, 90, Icons.Bolt);
+            _btnBoost = HoldButton.Create(r, "BOOST", BoostCol, 90, Icons.Bolt);
             ((RectTransform)_btnBoost.transform).At(1, 0, -152, 132, 90, 90);
 
             var badge = Ui.Img(r, Ui.Circle, Pal.Cyan, "BoostBadge");
@@ -286,33 +278,39 @@ namespace FRF
         {
             public RectTransform Rt;
             public Text Name;
-            public Image Bar;
+            public Image Bar, Pointer, Pill;
         }
 
         readonly List<Tag> _tags = new List<Tag>();
 
+        /// <summary>Rival tags: name on a dark pill, a balance bar in the rider's colour, a pointer down to them.</summary>
         void BuildTags()
         {
             var layer = Ui.Node(_root, "Tags").Fill();
             layer.SetAsFirstSibling();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 7; i++)
             {
                 var rt = Ui.Node(layer, "Tag");
-                rt.sizeDelta = new Vector2(94, 28);
+                rt.sizeDelta = new Vector2(84, 40);
                 rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-                var name = Ui.Label(rt, "", 15, Color.white, TextAnchor.UpperCenter, true, "Name");
+                rt.pivot = new Vector2(0.5f, 0);
+                var pill = Ui.Panel(rt, new Color(0.02f, 0.03f, 0.06f, 0.78f), 8, "Pill");
+                pill.raycastTarget = false;
+                pill.rectTransform.At(0.5f, 1, 0, 0, 74, 20);
+                var name = Ui.Label(pill.transform, "", 15, Color.white, TextAnchor.MiddleCenter, true, "Name");
                 name.rectTransform.Fill();
-                Ui.Outline(name, new Color(0, 0, 0, 0.75f), 1.5f);
-                var bg = Ui.Img(rt, Ui.Round(4), new Color(0, 0, 0, 0.60f), "BarBg");
+                var bg = Ui.Img(rt, Ui.Round(3), new Color(0, 0, 0, 0.6f), "BarBg");
                 bg.type = Image.Type.Sliced;
                 bg.preserveAspect = false;
-                bg.rectTransform.At(0.5f, 0, 0, 0, 60, 6);
-                var bar = Ui.Img(bg.transform, Ui.Round(4), Pal.Green, "Bar");
+                bg.rectTransform.At(0.5f, 1, 0, -23, 66, 7);
+                var bar = Ui.Img(bg.transform, Ui.Round(3), Pal.Green, "Bar");
                 bar.type = Image.Type.Sliced;
                 bar.preserveAspect = false;
                 bar.rectTransform.Fill();
+                var ptr = Ui.Img(rt, Icons.Pointer, Color.white, "Pointer");
+                ptr.rectTransform.At(0.5f, 0, 0, 0, 13, 9);
                 rt.gameObject.SetActive(false);
-                _tags.Add(new Tag { Rt = rt, Name = name, Bar = bar });
+                _tags.Add(new Tag { Rt = rt, Name = name, Bar = bar, Pointer = ptr, Pill = pill });
             }
         }
 
@@ -340,14 +338,32 @@ namespace FRF
                     float s = Mathf.Lerp(1.1f, 0.7f, dist / 32);
                     tag.Rt.localScale = new Vector3(s, s, 1);
                     tag.Name.text  = r.Def.Nick;
-                    tag.Name.color = r.HitFlash > 0 ? Pal.Red : Color.Lerp(r.Def.Jersey, Color.white, 0.45f);
+                    tag.Name.color = r.HitFlash > 0 ? Pal.Red : Color.white;
+                    // The bar shows the rival's balance in their jersey colour, red when nearly down.
                     float hp = Mathf.Clamp01(r.Health / 100f);
+                    var jersey = r.Def.Jersey.Luma() < 0.25f ? r.Def.Jersey.Lighten(0.35f) : r.Def.Jersey;
                     tag.Bar.rectTransform.anchorMax = new Vector2(hp, 1);
-                    tag.Bar.color = hp > 0.6f ? Pal.Green : hp > 0.3f ? Pal.Yellow : Pal.Red;
+                    tag.Bar.color = hp > 0.3f ? jersey : Pal.Red;
+                    tag.Pointer.color = jersey;
                 }
             }
             for (int i = used; i < _tags.Count; i++)
                 if (_tags[i].Rt.gameObject.activeSelf) _tags[i].Rt.gameObject.SetActive(false);
+
+            // Riders bunched together: lift overlapping tags so every name stays readable.
+            for (int pass = 0; pass < 2; pass++)
+            for (int i = 0; i < used; i++)
+            for (int j = i + 1; j < used; j++)
+            {
+                var a = _tags[i].Rt;
+                var b = _tags[j].Rt;
+                var d = b.anchoredPosition - a.anchoredPosition;
+                if (Mathf.Abs(d.x) > 78 || Mathf.Abs(d.y) > 34) continue;
+                // The farther (smaller) tag moves up.
+                var move = b.localScale.x <= a.localScale.x ? b : a;
+                var stay = move == b ? a : b;
+                move.anchoredPosition = new Vector2(move.anchoredPosition.x, stay.anchoredPosition.y + 34);
+            }
         }
 
         void Intro()
@@ -520,7 +536,7 @@ namespace FRF
             _place.text  = Ui.Ord(p.Place);
             _place.color = p.Place == 1 ? Pal.Gold : Color.white;
             _placeOf.text = "/" + d.Riders.Count;
-            _placeOf.rectTransform.anchoredPosition = new Vector2(14 + _place.preferredWidth + 2, -18);
+            _placeOf.rectTransform.anchoredPosition = new Vector2(22 + _place.preferredWidth + 3, -18);
 
             // Timer
             _time.text = Ui.Time(d.Clock);
@@ -529,12 +545,10 @@ namespace FRF
             _speed.text  = Mathf.RoundToInt(p.Kmh).ToString();
             _speed.color = p.Boosting ? Pal.Yellow : Color.white;
 
-            // Gauge colour: green → yellow → orange → cyan on boost
+            // Gauge: the gradient sprite carries green-to-red; boost tints it cyan.
             float sp = Mathf.Clamp01(p.Kmh / 90f);
             _gaugeFill.fillAmount = Mathf.Lerp(_gaugeFill.fillAmount, 0.75f * sp, 1 - Mathf.Exp(-Time.unscaledDeltaTime * 10));
-            _gaugeFill.color = p.Boosting ? Pal.Cyan
-                : sp < 0.55f ? Color.Lerp(Pal.Green, Pal.Yellow, sp / 0.55f)
-                : Color.Lerp(Pal.Yellow, Pal.Orange, (sp - 0.55f) / 0.45f);
+            _gaugeFill.color = p.Boosting ? new Color(0.55f, 1f, 1f) : Color.white;
 
             _progress.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(p.S / d.Track.FinishS), 1);
 
@@ -547,11 +561,10 @@ namespace FRF
                 _tiltDot.color = Mathf.Abs(_steerShown) > 0.1f ? Pal.Orange : Color.white;
             }
 
-            // Goal text
+            // Stats pill, with the event target when the event is about tricks or takedowns.
             var ev = d.Cfg.Event;
-            if (ev != null && ev.Kind == EventKind.Tricks)   _goal.text = "TRICKS  " + p.TrickScore.ToString("N0") + " / " + ev.Bronze.ToString("N0");
-            else if (ev != null && ev.Kind == EventKind.Takedown) _goal.text = "TAKEDOWNS  " + p.Takedowns + " / " + ev.Bronze;
-            else _goal.text = "TRICKS " + p.TrickScore.ToString("N0") + "   ·   TAKEDOWNS " + p.Takedowns;
+            _tricksText.text = "TRICKS  " + p.TrickScore.ToString("N0") + (ev != null && ev.Kind == EventKind.Tricks ? " / " + ev.Bronze.ToString("N0") : "");
+            _tdText.text = "TAKEDOWNS  " + p.Takedowns + (ev != null && ev.Kind == EventKind.Takedown ? " / " + ev.Bronze : "");
 
             // Progress dots
             float w = _bar.rect.width;
@@ -593,9 +606,9 @@ namespace FRF
                 }
                 else
                 {
-                    _btnA.Set("PUNCH", Pal.Red,                           Icons.Punch);
-                    _btnB.Set("JUMP",  Pal.Orange,                        Icons.Jump);
-                    _btnC.Set("BRAKE", new Color(0.30f, 0.34f, 0.45f),   Icons.Brake);
+                    _btnA.Set("PUNCH", PunchCol, Icons.Punch);
+                    _btnB.Set("JUMP",  JumpCol,  Icons.Jump);
+                    _btnC.Set("BRAKE", BrakeCol, Icons.BrakeDisc);
                 }
             }
 
@@ -734,7 +747,7 @@ namespace FRF
 
             // Settings rows inside pause
             float y = -230;
-            void PauseRow(string label, string[] opts, int sel, Action<int> pick)
+            void PauseRow(string label, string[] opts, int sel, System.Action<int> pick)
             {
                 var l = Ui.Label(c, label, 15, Pal.Dim, TextAnchor.MiddleLeft, false, "L" + label);
                 l.rectTransform.At(0, 1, 30, y, 120, 30);

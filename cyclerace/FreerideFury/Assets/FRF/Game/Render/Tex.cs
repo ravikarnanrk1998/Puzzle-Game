@@ -234,6 +234,67 @@ namespace FRF
             return px.ToTexture("Trail", true, TextureWrapMode.Repeat, FilterMode.Trilinear, 8);
         }
 
+        /// <summary>
+        /// Tileable cumulus for the sky dome: alpha is cloud cover, red is lightness
+        /// (lit tops, greyer bases), read by the FRF/SkyClouds shader.
+        /// </summary>
+        public static Texture2D Clouds(float cover, int seed)
+        {
+            const int s = 512;
+            var px = new Px(s, s, new Color32(255, 255, 255, 0));
+            float ox = seed * 0.37f % 8, oy = seed * 0.71f % 8;
+            for (int j = 0; j < s; j++)
+            for (int i = 0; i < s; i++)
+            {
+                float u = i / (float)s * 4 + ox, v = j / (float)s * 4 + oy;
+                float n = FbmTiled(u, v, 4, 4, 5);
+                float billow = FbmTiled(u * 2 + 3.1f, v * 2 + 1.7f, 8, 8, 3);
+                float d = n * 0.8f + billow * 0.2f;
+                float a = SmoothStep(0.62f - cover * 0.18f, 0.78f - cover * 0.12f, d);
+                // Light from above: the density a little "below" darkens the base.
+                float below = FbmTiled(u, v - 0.06f, 4, 4, 5);
+                float light = Mathf.Lerp(1f, 0.35f, SmoothStep(0.5f, 0.85f, below) * 0.8f);
+                byte lb = (byte)(Mathf.Clamp01(light) * 255);
+                px.P[j * s + i] = new Color32(lb, lb, lb, (byte)(Mathf.Clamp01(a * 0.95f) * 255));
+            }
+            return px.ToTexture("Clouds", true, TextureWrapMode.Repeat, FilterMode.Trilinear, 2);
+        }
+
+        /// <summary>
+        /// Grass tufts (two variants side by side) with alpha: blades fanning from the base,
+        /// dark at the root and light at the tips.
+        /// </summary>
+        public static Texture2D GrassTuft(Color baseC, Color tipC)
+        {
+            const int w = 256, h = 128;
+            var px = new Px(w, h, new Color32(0, 0, 0, 0));
+            var rnd = new System.Random(77);
+            for (int variant = 0; variant < 2; variant++)
+            {
+                float x0 = variant * 128;
+                int blades = 22 + variant * 6;
+                for (int b = 0; b < blades; b++)
+                {
+                    float bx = x0 + 64 + ((float)rnd.NextDouble() - 0.5f) * 56;
+                    float lean = ((float)rnd.NextDouble() - 0.5f) * 70;
+                    float height = 60 + (float)rnd.NextDouble() * 62;
+                    float width = 4 + (float)rnd.NextDouble() * 4;
+                    float tint = (float)rnd.NextDouble();
+                    int steps = 40;
+                    for (int k = 0; k < steps; k++)
+                    {
+                        float t = k / (float)steps;
+                        // Curving blade: bends further at the top.
+                        float x = bx + lean * t * t;
+                        float y = 2 + height * t;
+                        var c = Color.Lerp(baseC, tipC, t * 0.85f + tint * 0.15f);
+                        px.Circle(x, y, width * (1 - t * 0.85f) * 0.5f + 0.4f, c);
+                    }
+                }
+            }
+            return px.ToTexture("GrassTuft", true, TextureWrapMode.Clamp, FilterMode.Trilinear, 2);
+        }
+
         /// <summary>Neutral grain for detail maps (0.5 grey = no change).</summary>
         public static Texture2D Grain(Biome biome)
         {

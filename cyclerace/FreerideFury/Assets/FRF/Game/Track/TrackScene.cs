@@ -9,7 +9,11 @@ namespace FRF
         public Track Track { get; private set; }
         public TerrainField Field { get; private set; }
         Theme Th => Track.Theme;
-        Material _trail, _terrain, _planks;
+        Material _trail, _terrain, _planks, _rock;
+        bool _photoTrail;
+
+        /// <summary>Photo trail texture size on the ground (metres per tile).</summary>
+        const float TrailTile = 3.2f;
         GraphicsQuality _q;
 
         public static TrackScene Build(TrackDef def, Transform parent, GraphicsQuality q)
@@ -27,19 +31,63 @@ namespace FRF
         {
             float cell = _q == GraphicsQuality.High ? 6 : _q == GraphicsQuality.Medium ? 8 : 10;
             Field = new TerrainField(Track, cell, 280);
-            _trail = Mats.Lit(Color.white, Th.Biome == Biome.Glacier ? 0.45f : 0.08f, Tex.Trail(Th));
-            _terrain = Mats.Terrain(ColorMap(), Tex.Grain(Th.Biome), new Vector2(Field.SizeX / 9f, Field.SizeZ / 9f), Th.Biome == Biome.Glacier ? 0.35f : 0.05f);
+            // Photo trail (Poly Haven) when available, else the procedural one.
+            var trailDiff = Art.Tex(Th.TrailTex + "_diff");
+            _photoTrail = trailDiff != null;
+            _trail = _photoTrail
+                ? Mats.LitNormal(trailDiff, Art.Tex(Th.TrailTex + "_nor"), Th.TrailTint, Th.Biome == Biome.Glacier ? 0.35f : 0.1f, 1.2f)
+                : Mats.Lit(Color.white, Th.Biome == Biome.Glacier ? 0.45f : 0.08f, Tex.Trail(Th));
+            var detail = Art.Tex(Th.DetailTex + "_detail");
+            _terrain = detail != null
+                ? Mats.Terrain(ColorMap(), detail, new Vector2(Field.SizeX / 5f, Field.SizeZ / 5f), Th.Biome == Biome.Glacier ? 0.3f : 0.05f, Art.Tex(Th.DetailTex + "_nor"))
+                : Mats.Terrain(ColorMap(), Tex.Grain(Th.Biome), new Vector2(Field.SizeX / 9f, Field.SizeZ / 9f), Th.Biome == Biome.Glacier ? 0.35f : 0.05f);
+            var rockDiff = Art.Tex(Th.RockTex + "_diff");
+            _rock = rockDiff != null ? Mats.LitNormal(rockDiff, Art.Tex(Th.RockTex + "_nor"), Th.RockTint, 0.12f, 1.3f) : null;
             _planks = Mats.Lit(Color.white, 0.15f, Tex.Planks());
             TerrainChunks();
             TrailChunks();
             Verges();
             Ramps();
             TrailDressing();
+            GrassTufts();
             Gates();
             Scatter();
+            Lake();
             Crowds();
             Mountains();
+            FlushRocks();
             Palette.Apply();
+        }
+
+        // ------------------------------------------------------------ photo rocks
+
+        readonly Dictionary<long, MeshBuilder> _rockTiles = new Dictionary<long, MeshBuilder>();
+
+        MeshBuilder RocksFor(Vector3 p)
+        {
+            long key = ((long)Mathf.FloorToInt(p.x / 180f) << 32) ^ (uint)Mathf.FloorToInt(p.z / 180f);
+            if (!_rockTiles.TryGetValue(key, out var b)) _rockTiles[key] = b = new MeshBuilder();
+            return b;
+        }
+
+        /// <summary>A boulder: photo-textured when the rock texture is present, palette otherwise.</summary>
+        void Boulder(MeshBuilder palette, Vector3 at, float size, System.Random r, float flat = 0.75f)
+        {
+            if (_rock != null) Props.BoulderTex(RocksFor(at), at, size, r, flat);
+            else Props.Boulder(palette, at, size, Th, r, flat);
+        }
+
+        void FlushRocks()
+        {
+            if (_rockTiles.Count == 0) return;
+            var parent = new GameObject("Rocks").transform;
+            parent.SetParent(transform, false);
+            foreach (var kv in _rockTiles)
+            {
+                var mesh = kv.Value.Build("Rocks");
+                mesh.RecalculateTangents();
+                MeshKit.Obj("RockTile", parent, mesh, _rock).isStatic = true;
+            }
         }
 
         // ------------------------------------------------------------ colour map
@@ -139,6 +187,7 @@ namespace FRF
                 }
                 var mesh = b.Build("Terrain", false);
                 mesh.SetNormals(normals);
+                mesh.RecalculateTangents();
                 var go = MeshKit.Obj("Chunk", parent, mesh, _terrain, false, true);
                 go.isStatic = true;
             }
@@ -174,7 +223,9 @@ namespace FRF
                     for (int k = 0; k <= cols; k++)
                     {
                         float x = -half + 2 * half * k / cols;
-                        b.Add(tr.World(s, x, tr.TrailY(s, x) + 0.03f), new Vector2(k / (float)cols, s / 14f));
+                        // Photo texture: true metres in both directions; procedural: edge to edge across.
+                        var uv = _photoTrail ? new Vector2((x + half) / TrailTile, s / TrailTile) : new Vector2(k / (float)cols, s / 14f);
+                        b.Add(tr.World(s, x, tr.TrailY(s, x) + 0.03f), uv);
                         normals.Add(TrailNormal(s, x));
                     }
                 }
@@ -186,6 +237,7 @@ namespace FRF
                 }
                 var mesh = b.Build("Trail", false);
                 mesh.SetNormals(normals);
+                mesh.RecalculateTangents();
                 MeshKit.Obj("Trail", parent, mesh, _trail, false, true).isStatic = true;
             }
         }
@@ -228,6 +280,7 @@ namespace FRF
                     }
                     var mesh = b.Build("Verge", false);
                     mesh.SetNormals(normals);
+                    mesh.RecalculateTangents();
                     MeshKit.Obj("Verge", parent, mesh, _terrain, false, true).isStatic = true;
                 }
             }
@@ -250,9 +303,10 @@ namespace FRF
                 for (int q = 0; q <= steps; q++)
                 {
                     float s = r.S0 + r.Len * q / steps, lift = r.Height * q / steps + 0.04f;
-                    float v = r.Wood ? q / (float)steps * 2.2f : s / 14f;
+                    float v = r.Wood ? q / (float)steps * 2.2f : _photoTrail ? s / TrailTile : s / 14f;
+                    float u1 = r.Wood ? width / 1.4f : _photoTrail ? width / TrailTile : 1;
                     b.Add(tr.World(s, r.X0, tr.TrailY(s, r.X0) + lift), new Vector2(0, v));
-                    b.Add(tr.World(s, r.X1, tr.TrailY(s, r.X1) + lift), new Vector2(r.Wood ? width / 1.4f : 1, v));
+                    b.Add(tr.World(s, r.X1, tr.TrailY(s, r.X1) + lift), new Vector2(u1, v));
                 }
                 for (int q = 0; q < steps; q++)
                 {
@@ -307,7 +361,7 @@ namespace FRF
                     {
                         float x = k % 2 == 0 ? r.X0 - 0.4f : r.X1 + 0.4f;
                         float s = r.S0 + r.Len * (0.3f + 0.4f * (float)rnd.NextDouble());
-                        Props.Boulder(deco, tr.WorldOnGround(s, x, -0.1f), 0.45f, Th, rnd);
+                        Boulder(deco, tr.WorldOnGround(s, x, -0.1f), 0.45f, rnd);
                     }
                 }
             }
@@ -319,15 +373,20 @@ namespace FRF
                 for (float x = -half - 1.5f; x <= half + 1.5f; x += 1.6f)
                 {
                     var at = tr.World(s + 1.6f, x, tr.TrailY(s + 1.6f, x) + 0.2f);
-                    Props.Boulder(deco, at, 0.85f, Th, rnd, 1.1f);
+                    Boulder(deco, at, 0.85f, rnd, 1.1f);
                 }
                 foreach (float x in new[] { -half - 3.2f, half + 3.2f })
-                    Props.Boulder(deco, tr.World(s - 1, x, tr.TrailY(s - 1, x) - 0.3f), 1.6f, Th, rnd, 0.9f);
+                    Boulder(deco, tr.World(s - 1, x, tr.TrailY(s - 1, x) - 0.3f), 1.6f, rnd, 0.9f);
             }
             var parent = new GameObject("Jumps").transform;
             parent.SetParent(transform, false);
             if (wood.Count > 0) MeshKit.Obj("WoodRamps", parent, wood.Build("WoodRamps"), _planks);
-            if (dirt.Count > 0) MeshKit.Obj("DirtRamps", parent, dirt.Build("DirtRamps"), _trail);
+            if (dirt.Count > 0)
+            {
+                var dm = dirt.Build("DirtRamps");
+                dm.RecalculateTangents();
+                MeshKit.Obj("DirtRamps", parent, dm, _trail);
+            }
             if (deco.Count > 0) MeshKit.Obj("RampDeco", parent, deco.Build("RampDeco"), Palette.Lit);
         }
 
@@ -340,16 +399,22 @@ namespace FRF
             var tape = new MeshBuilder();
             float yawOf(float s) => tr.HeadAt(s) * Mathf.Rad2Deg;
 
-            foreach (var o in tr.Obstacles) Props.Obstacle(b, tr.WorldOnGround(o.S, o.X, -0.05f), yawOf(o.S), o, Th);
+            foreach (var o in tr.Obstacles)
+            {
+                var at = tr.WorldOnGround(o.S, o.X, -0.05f);
+                if (o.Kind == ObstacleKind.Rock && _rock != null) Props.ObstacleRockTex(RocksFor(at), at, yawOf(o.S), o);
+                else Props.Obstacle(b, at, yawOf(o.S), o, Th);
+            }
 
-            var red = Palette.Uv(Mats.Hex(0xE53935));
-            var white = Palette.Uv(Mats.Hex(0xF5F5F5));
-            var stakeC = Mats.Hex(0xEDEDED);
+            // Wooden post-and-rail fences both sides; hay bales on the outside of hard corners.
+            var postC = Mats.Hex(0x5E4129);
+            var railC = Mats.Hex(0x8A6440);
+            const float postGap = 3.6f;
             for (int side = -1; side <= 1; side += 2)
             {
                 Vector3? prev = null;
-                int seg = 0;
-                for (float s = tr.StartS + 26; s < tr.FinishS - 14; s += 7)
+                int n = 0;
+                for (float s = tr.StartS + 26; s < tr.FinishS - 14; s += postGap, n++)
                 {
                     float half = tr.WidthAt(s) * 0.5f;
                     float k = tr.CurvAt(s);
@@ -358,8 +423,7 @@ namespace FRF
                     var foot = tr.World(s, x, tr.TrailY(s, x));
                     if (outside)
                     {
-                        // Hay bales on the outside of hard corners.
-                        for (float q = 0; q < 7; q += 1.35f)
+                        for (float q = 0; q < postGap; q += 1.35f)
                         {
                             float sq = s + q;
                             float hx = side * (tr.WidthAt(sq) * 0.5f + 2.3f);
@@ -368,19 +432,52 @@ namespace FRF
                         prev = null;
                         continue;
                     }
-                    b.Beam(foot + Vector3.down * 0.3f, foot + Vector3.up * 1.0f, 0.06f, 0.06f, stakeC);
-                    var top = foot + Vector3.up * 0.88f;
+                    var pc = n % 3 == 0 ? postC.Darken(0.12f) : postC;
+                    b.Beam(foot + Vector3.down * 0.3f, foot + Vector3.up * 1.12f, 0.13f, 0.13f, pc);
                     if (prev != null)
                     {
                         var a = prev.Value;
-                        var mid = (a + top) * 0.5f + Vector3.down * 0.12f;
-                        var uv = seg++ % 2 == 0 ? red : white;
-                        foreach (var (p, q) in new[] { (a, mid), (mid, top) })
-                        {
-                            tape.Panel(p, q, q + Vector3.up * 0.07f, p + Vector3.up * 0.07f, uv, Vector3.Cross(q - p, Vector3.up));
-                        }
+                        var rc = n % 2 == 0 ? railC : railC.Darken(0.08f);
+                        b.Beam(a + Vector3.up * 0.5f, foot + Vector3.up * 0.5f, 0.07f, 0.12f, rc);
+                        b.Beam(a + Vector3.up * 0.98f, foot + Vector3.up * 0.98f, 0.07f, 0.12f, rc);
                     }
-                    prev = top;
+                    prev = foot;
+                }
+            }
+
+            // Race banners on poles, alternating sides, facing the riders.
+            var bannerCols = new[] { Mats.Hex(0xC62828), Mats.Hex(0x1A5FB4), Mats.Hex(0xE65100) };
+            var trim = Palette.Uv(Mats.Hex(0xF4C430));
+            var poleC = Mats.Hex(0x3A3A40);
+            int bi = 0;
+            for (float s = tr.StartS + 40; s < tr.FinishS - 20; s += 48, bi++)
+            {
+                int side = bi % 2 == 0 ? -1 : 1;
+                if (Mathf.Abs(tr.CurvAt(s)) > 0.02f && Mathf.Sign(tr.CurvAt(s)) == -side) side = -side;
+                float half = tr.WidthAt(s) * 0.5f;
+                float x = side * (half + 3.5f);
+                var foot = tr.World(s, x, tr.TrailY(s, x));
+                var right = tr.Right(s);
+                b.Cylinder(foot + Vector3.down * 0.4f, foot + Vector3.up * 4.4f, 0.07f, 0.06f, 6, poleC);
+                var inward = -right * side;
+                b.Beam(foot + Vector3.up * 4.2f, foot + Vector3.up * 4.2f + inward * 1.05f, 0.06f, 0.06f, poleC);
+                var c = Palette.Uv(bannerCols[bi % bannerCols.Length]);
+                var t0 = foot + Vector3.up * 4.15f + inward * 0.12f;
+                var t1 = t0 + inward * 0.88f;
+                var b0 = t0 + Vector3.down * 2.2f;
+                var b1 = t1 + Vector3.down * 2.2f;
+                var fwd = tr.Forward(s);
+                tape.Panel(b0, b1, t1, t0, c, -fwd);
+                // Gold trim bands and an emblem diamond, slightly proud of the cloth on both faces.
+                foreach (float off in new[] { -0.012f, 0.012f })
+                {
+                    var o = fwd * off;
+                    tape.Panel(t0 + Vector3.down * 0.18f + o, t1 + Vector3.down * 0.18f + o, t1 + Vector3.down * 0.1f + o, t0 + Vector3.down * 0.1f + o, trim, fwd * Mathf.Sign(off));
+                    tape.Panel(b0 + Vector3.up * 0.1f + o, b1 + Vector3.up * 0.1f + o, b1 + Vector3.up * 0.18f + o, b0 + Vector3.up * 0.18f + o, trim, fwd * Mathf.Sign(off));
+                    var mid = (t0 + t1 + b0 + b1) * 0.25f + Vector3.up * 0.15f + o;
+                    var dx = inward * 0.24f;
+                    var dy = Vector3.up * 0.32f;
+                    tape.Panel(mid - dy, mid + dx, mid + dy, mid - dx, trim, fwd * Mathf.Sign(off));
                 }
             }
             foreach (var (s, dir) in tr.Chevrons)
@@ -411,9 +508,26 @@ namespace FRF
             var right = tr.Right(s0);
             var c = tr.WorldOnGround(-4, 0);
             b.Xf = Matrix4x4.TRS(c, Quaternion.LookRotation(fwd), Vector3.one);
-            b.Box(new Vector3(0, 1.4f, -3), new Vector3(half, 1.4f, 2.2f), Mats.Hex(0x6B4A30));
-            b.Box(new Vector3(0, 3.0f, -3), new Vector3(half + 0.5f, 0.2f, 2.6f), Mats.Hex(0x3A3A40));
-            b.Box(new Vector3(0, 1.0f, -0.6f), new Vector3(half, 0.12f, 0.12f), Mats.Hex(0xE53935));
+            // Two race canopies behind the start line and a banner wall behind them.
+            var white = Mats.Hex(0xF2F2F2);
+            var leg = Mats.Hex(0x9AA0A8);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                var roof = side < 0 ? Pal.Orange : Mats.Hex(0x1A5FB4);
+                var tc = new Vector3(side * (half - 2.6f), 0, -3.2f);
+                foreach (var (lx, lz) in new[] { (-1.5f, -1.5f), (1.5f, -1.5f), (1.5f, 1.5f), (-1.5f, 1.5f) })
+                    b.Beam(tc + new Vector3(lx, -0.3f, lz), tc + new Vector3(lx, 2.45f, lz), 0.07f, 0.07f, leg);
+                b.Box(tc + new Vector3(0, 2.32f, 0), new Vector3(1.58f, 0.16f, 1.58f), white);
+                b.Cylinder(tc + new Vector3(0, 2.48f, 0), tc + new Vector3(0, 3.5f, 0), 2.25f, 0, 4, roof, true, Mathf.PI / 4);
+                b.Box(tc + new Vector3(0, 0.75f, 0.6f), new Vector3(1.1f, 0.05f, 0.4f), white);
+            }
+            for (int k = 0; k < 6; k++)
+            {
+                float x0 = -half - 1 + k * (2 * half + 2) / 6f;
+                var col = k % 3 == 0 ? Pal.Orange : k % 3 == 1 ? Mats.Hex(0x15171C) : Mats.Hex(0x1A5FB4);
+                b.Box(new Vector3(x0 + (half + 1) / 6f, 1.1f, -6.5f), new Vector3((half + 1) / 6f - 0.04f, 0.9f, 0.05f), col);
+                b.Beam(new Vector3(x0, -0.3f, -6.45f), new Vector3(x0, 2.1f, -6.45f), 0.06f, 0.06f, leg);
+            }
             b.Xf = Matrix4x4.identity;
             // Finish area: fence panels.
             var fence = Mats.Hex(0xB0B6BE);
@@ -508,32 +622,33 @@ namespace FRF
             {
                 if (f.Clearance(p.x, p.z) < 3.2f) return;
                 p.y = f.HeightAt(p.x, p.z);
+                if (f.HasLake && p.y < f.LakeY + 0.6f) return;
                 var b = Tile(tiles, p);
                 double roll = rnd.NextDouble();
                 switch (Th.Biome)
                 {
                     case Biome.Forest:
-                        if (roll < 0.1) Props.Boulder(b, p, R(0.6f, 2.2f), Th, rnd);
+                        if (roll < 0.1) Boulder(b, p, R(0.6f, 2.2f), rnd);
                         else if (roll < 0.25) Props.Broadleaf(b, p, R(6, 10), Th, rnd);
                         else Props.Pine(b, p, R(7, 15), Th, rnd);
                         break;
                     case Biome.Autumn:
-                        if (roll < 0.1) Props.Boulder(b, p, R(0.6f, 2f), Th, rnd);
+                        if (roll < 0.1) Boulder(b, p, R(0.6f, 2f), rnd);
                         else if (roll < 0.28) Props.Pine(b, p, R(7, 13), Catalog.Forest, rnd);
                         else Props.Broadleaf(b, p, R(6, 11), Th, rnd);
                         break;
                     case Biome.Glacier:
-                        if (roll < 0.3) Props.Boulder(b, p, R(0.8f, 2.6f), Th, rnd);
+                        if (roll < 0.3) Boulder(b, p, R(0.8f, 2.6f), rnd);
                         else Props.Pine(b, p, R(6, 13), Th, rnd, true);
                         break;
                     case Biome.Canyon:
                         if (roll < 0.35) Props.Cactus(b, p, R(2.4f, 4.6f), rnd);
-                        else if (roll < 0.8) Props.Boulder(b, p, R(0.8f, 3.4f), Th, rnd, R(0.5f, 1.2f));
+                        else if (roll < 0.8) Boulder(b, p, R(0.8f, 3.4f), rnd, R(0.5f, 1.2f));
                         else Props.Broadleaf(b, p, R(2.5f, 4), Th, rnd);
                         break;
                     default:
                         if (roll < 0.45) Props.DeadTree(b, p, R(5, 9), Th, rnd);
-                        else if (roll < 0.93 || band < 20) Props.Boulder(b, p, R(0.8f, 3f), Th, rnd);
+                        else if (roll < 0.93 || band < 20) Boulder(b, p, R(0.8f, 3f), rnd);
                         else Props.Vent(b, Tile(glowTiles, p), p, R(1.4f, 2.6f), Th, rnd);
                         break;
                 }
@@ -564,6 +679,96 @@ namespace FRF
             parent.SetParent(transform, false);
             foreach (var kv in tiles) MeshKit.Obj("Tile", parent, kv.Value.Build("Scenery"), Palette.Lit).isStatic = true;
             foreach (var kv in glowTiles) MeshKit.Obj("Glow", parent, kv.Value.Build("Lava"), Palette.Glow, false, false).isStatic = true;
+        }
+
+        /// <summary>
+        /// Crossed-quad grass tufts along the trail edges and verges (alpha-cut, double sided,
+        /// normals up so they light like the ground). Skipped on LOW and on snow and ash.
+        /// </summary>
+        void GrassTufts()
+        {
+            if (_q == GraphicsQuality.Low) return;
+            Color baseC, tipC;
+            switch (Th.Biome)
+            {
+                case Biome.Forest:
+                    baseC = Th.GrassDark.Darken(0.25f);
+                    tipC = Th.Grass.Lighten(0.2f);
+                    break;
+                case Biome.Autumn:
+                    baseC = Mats.Hex(0x5E6A26);
+                    tipC = Mats.Hex(0xD2B456);
+                    break;
+                case Biome.Canyon:
+                    baseC = Mats.Hex(0x7A5A30);
+                    tipC = Mats.Hex(0xE2C88A);
+                    break;
+                default:
+                    return;
+            }
+            var mat = Mats.LitCutout(Tex.GrassTuft(baseC, tipC), true);
+            var tr = Track;
+            var rnd = new System.Random(tr.Def.Seed + 909);
+            int count = _q == GraphicsQuality.High ? 7000 : 3600;
+            if (Th.Biome == Biome.Canyon) count /= 2;
+            const float chunk = 160;
+            var chunks = new Dictionary<int, (MeshBuilder B, List<Vector3> N)>();
+            for (int i = 0; i < count; i++)
+            {
+                float s = tr.StartS + 20 + (float)rnd.NextDouble() * (tr.Length - tr.StartS - 30);
+                float half = tr.WidthAt(s) * 0.5f;
+                int side = rnd.NextDouble() < 0.5 ? -1 : 1;
+                // Most tufts hug the trail edge; some spread over the verge.
+                float off = (float)rnd.NextDouble();
+                off = -0.7f + off * off * 9.5f;
+                float x = side * (half + off);
+                if (Mathf.Abs(x) > half + 2.2f && Mathf.Abs(x) < half + 3.0f) continue; // keep the fence line clear
+                var p = tr.World(s, x, tr.TrailY(s, x) - 0.04f);
+                int key = (int)(s / chunk);
+                if (!chunks.TryGetValue(key, out var ch)) chunks[key] = ch = (new MeshBuilder(), new List<Vector3>());
+                float w = 0.5f + (float)rnd.NextDouble() * 0.45f, h = 0.35f + (float)rnd.NextDouble() * 0.45f;
+                float yaw = (float)rnd.NextDouble() * Mathf.PI;
+                float u0 = rnd.NextDouble() < 0.5 ? 0 : 0.5f;
+                for (int q = 0; q < 2; q++)
+                {
+                    float a = yaw + q * Mathf.PI * 0.5f;
+                    var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * w;
+                    int v0 = ch.B.Add(p - d, new Vector2(u0, 0));
+                    int v1 = ch.B.Add(p + d, new Vector2(u0 + 0.5f, 0));
+                    int v2 = ch.B.Add(p + d + Vector3.up * h, new Vector2(u0 + 0.5f, 1));
+                    int v3 = ch.B.Add(p - d + Vector3.up * h, new Vector2(u0, 1));
+                    ch.B.Quad(v0, v1, v2, v3, Vector3.Cross(d, Vector3.up));
+                    for (int k = 0; k < 4; k++) ch.N.Add(Vector3.up);
+                }
+            }
+            var parent = new GameObject("Grass").transform;
+            parent.SetParent(transform, false);
+            foreach (var kv in chunks)
+            {
+                var mesh = kv.Value.B.Build("Grass", false);
+                mesh.SetNormals(kv.Value.N);
+                MeshKit.Obj("Tufts", parent, mesh, mat, false, true).isStatic = true;
+            }
+        }
+
+        /// <summary>Lake surface filling the basin beyond the end of the course.</summary>
+        void Lake()
+        {
+            var f = Field;
+            if (!f.HasLake) return;
+            var tr = Track;
+            var end = tr.Pos[tr.N - 1];
+            float h = tr.Head[tr.N - 1];
+            var fwd = new Vector3(Mathf.Sin(h), 0, Mathf.Cos(h));
+            var right = new Vector3(Mathf.Cos(h), 0, -Mathf.Sin(h));
+            var c = end + fwd * (TerrainField.LakeStart + 700);
+            c.y = f.LakeY;
+            var b = new MeshBuilder();
+            float hw = 900, hl = 760;
+            b.Quad(c - right * hw - fwd * hl, c + right * hw - fwd * hl, c + right * hw + fwd * hl, c - right * hw + fwd * hl,
+                Vector3.up, new Color32(255, 255, 255, 255), Vector2.zero, Vector2.one);
+            var water = Th.Biome == Biome.Glacier ? new Color(0.35f, 0.6f, 0.72f) : new Color(0.13f, 0.4f, 0.55f);
+            MeshKit.Obj("Lake", transform, b.Build("Lake"), Mats.Lit(water, 0.93f), false, true);
         }
 
         void Crowds()
@@ -605,7 +810,8 @@ namespace FRF
             var centre = new Vector3(f.X0 + f.SizeX * 0.5f, 0, f.Z0 + f.SizeZ * 0.5f);
             float ring = Mathf.Max(f.SizeX, f.SizeZ) * 0.5f + 150;
             float baseY = f.MinY - 40;
-            int peaks = 34;
+            // A photographed sky already has real mountains on its horizon.
+            int peaks = Art.Sky(Th.Sky) != null ? 0 : 30;
             for (int k = 0; k < peaks; k++)
             {
                 float a = k / (float)peaks * Mathf.PI * 2 + (float)rnd.NextDouble() * 0.15f;
@@ -627,12 +833,18 @@ namespace FRF
                     }
                     continue;
                 }
-                var tip = p + new Vector3((float)rnd.NextDouble() * 60 - 30, hgt, (float)rnd.NextDouble() * 60 - 30);
-                b.Cylinder(p, tip, rad, 0, 7 + rnd.Next(3), col, false, a);
-                // Cap from 62% of the height up.
-                float t0 = 0.62f + (float)rnd.NextDouble() * 0.1f;
-                var capBase = Vector3.Lerp(p, tip, t0);
-                b.Cylinder(capBase, tip + Vector3.up * 2, rad * (1 - t0) * 1.06f, 0, 7, Th.MountainCap, false, a);
+                // Jagged massif plus two shoulder peaks for a ragged ridgeline, hazed with distance.
+                float haze = Mathf.Clamp01((rr - ring) / 500f) * 0.45f + 0.2f;
+                var rockC = Color.Lerp(Th.Rock, Th.MountainFar, 0.45f);
+                float snowLine = Th.Biome == Biome.Glacier ? 0.35f : Th.Biome == Biome.Volcano ? 0.8f : 0.55f;
+                Props.Massif(b, p, rad, hgt * 1.25f, rockC, Th.MountainCap, Th.Fog, haze, snowLine, rnd);
+                for (int sp = 0; sp < 2; sp++)
+                {
+                    float off = (sp == 0 ? -1 : 1) * rad * (0.7f + (float)rnd.NextDouble() * 0.4f);
+                    var tang = new Vector3(-Mathf.Sin(a), 0, Mathf.Cos(a));
+                    var q = p + tang * off + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * (float)rnd.NextDouble() * 120;
+                    Props.Massif(b, q, rad * 0.75f, hgt * (0.6f + (float)rnd.NextDouble() * 0.35f), rockC, Th.MountainCap, Th.Fog, haze + 0.05f, snowLine + 0.05f, rnd);
+                }
             }
             if (Th.Biome == Biome.Volcano)
             {

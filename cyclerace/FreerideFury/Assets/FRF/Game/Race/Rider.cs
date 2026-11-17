@@ -67,7 +67,7 @@ namespace FRF
         bool _trickHeld;
         float _trickPts;
         readonly List<string> _combo = new List<string>();
-        bool _prevB;
+        bool _prevB, _spinArmed;
 
         // Crash.
         public bool Crashed;
@@ -195,8 +195,11 @@ namespace FRF
             }
             else
             {
+                // A steer held through the take-off must be let go first: spins only start
+                // from a fresh press in the air, so steering over a bump never spins you by accident.
+                if (Mathf.Abs(inp.Steer) < 0.2f) _spinArmed = true;
                 float ramp = Mathf.Clamp01((AirTime - 0.18f) / 0.15f);
-                if (CanAct) Spin += inp.Steer * SpinRate * ramp * dt;
+                if (CanAct && _spinArmed) Spin += inp.Steer * SpinRate * ramp * dt;
             }
 
             float vx = V * Mathf.Sin(Yaw) + DriftV;
@@ -240,6 +243,7 @@ namespace FRF
                     Grounded = false;
                     AirTime = 0;
                     Spin = 0;
+                    _spinArmed = false;
                     _combo.Clear();
                     _trickPts = 0;
                     if (Preload > 0.2f && CanAct)
@@ -280,6 +284,7 @@ namespace FRF
                     Grounded = false;
                     AirTime = 0;
                     Spin = 0;
+                    _spinArmed = false;
                     _combo.Clear();
                     _trickPts = 0;
                     Preload = 0;

@@ -1,0 +1,6 @@
+<linker>
+  <!-- GooglePlayTangle (Unity IAP Receipt Validation Obfuscator output) lives in Assembly-CSharp and is only
+       reached by reflection from UA.Billing, so keep it from being stripped. -->
+  <assembly fullname="Assembly-CSharp" preserve="all" ignoreIfMissing="1" />
+  <assembly fullname="UA.Billing" preserve="all" />
+</linker>

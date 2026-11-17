@@ -18,26 +18,106 @@ namespace FRF
             b.Xf = Matrix4x4.TRS(at, Quaternion.Euler(0, yaw, 0), Vector3.one * scale);
         }
 
-        /// <summary>Layered conifer; <paramref name="snow"/> whitens the tier tops.</summary>
+        /// <summary>
+        /// Layered conifer: several drooping tiers with jagged branch tips, lighter towards the
+        /// top; <paramref name="snow"/> lays snow on the upper faces.
+        /// </summary>
         public static void Pine(MeshBuilder b, Vector3 at, float height, Theme th, System.Random r, bool snow = false)
         {
             Place(b, at, (float)r.NextDouble() * 360);
             var green = Vary(Pick(th.Foliage, r), r);
             var trunk = Vary(th.Trunk, r);
             float h = height;
-            b.Cylinder(new Vector3(0, -0.4f, 0), new Vector3(0, h * 0.35f, 0), h * 0.035f, h * 0.025f, 5, trunk, false);
-            int tiers = h > 9 ? 4 : 3;
-            float baseR = h * 0.27f;
+            b.Cylinder(new Vector3(0, -0.4f, 0), new Vector3(0, h * 0.3f, 0), h * 0.038f, h * 0.026f, 6, trunk, false);
+            int tiers = h > 10 ? 5 : 4;
+            float baseR = h * 0.28f;
             for (int t = 0; t < tiers; t++)
             {
                 float f = t / (float)tiers;
-                float y0 = h * (0.2f + f * 0.62f), y1 = y0 + h * (0.42f - f * 0.08f);
-                float rr = baseR * (1 - f * 0.55f);
-                var c = snow && t % 2 == 1 ? th.Cap : green.Lighten(f * 0.12f);
-                b.Cylinder(new Vector3(0, y0, 0), new Vector3(0, y1, 0), rr, 0, 7, c, true, t * 0.5f);
+                float y0 = h * (0.16f + f * 0.7f), y1 = y0 + h * (0.3f - f * 0.1f);
+                float rr = baseR * (1 - f * 0.7f) * (0.92f + (float)r.NextDouble() * 0.16f);
+                var c = green.Lighten(f * 0.14f).Darken(t == 0 ? 0.12f : 0);
+                Tier(b, y0, y1, rr, c, snow ? th.Cap : (Color?)null, r, t * 0.7f);
             }
-            if (snow) b.Cylinder(new Vector3(0, h * 0.9f, 0), new Vector3(0, h * 1.02f, 0), baseR * 0.22f, 0, 6, th.Cap, true);
+            b.Cylinder(new Vector3(0, h * 0.95f, 0), new Vector3(0, h * 1.04f, 0), baseR * 0.08f, 0, 5, snow ? th.Cap : green.Lighten(0.15f), false);
             b.Xf = Matrix4x4.identity;
+        }
+
+        /// <summary>One branch tier: a cone whose rim zig-zags out to branch tips and droops at them.</summary>
+        static void Tier(MeshBuilder b, float y0, float y1, float rr, Color c, Color? snow, System.Random r, float twist)
+        {
+            const int n = 8;
+            var uv = Palette.Uv(c);
+            var under = Palette.Uv(c.Darken(0.35f));
+            var snowUv = snow != null ? Palette.Uv(snow.Value) : uv;
+            var apex = new Vector3(0, y1, 0);
+            var centre = new Vector3(0, y0 + (y1 - y0) * 0.18f, 0);
+            var rim = new Vector3[n];
+            for (int i = 0; i < n; i++)
+            {
+                float a = i / (float)n * Mathf.PI * 2 + twist;
+                bool tip = i % 2 == 0;
+                float rad = rr * (tip ? 1f : 0.72f) * (0.9f + (float)r.NextDouble() * 0.2f);
+                float droop = tip ? -(y1 - y0) * 0.12f : 0;
+                rim[i] = new Vector3(Mathf.Cos(a) * rad, y0 + droop, Mathf.Sin(a) * rad);
+            }
+            for (int i = 0; i < n; i++)
+            {
+                var p0 = rim[i];
+                var p1 = rim[(i + 1) % n];
+                // Upper faces (snow on alternate faces when snowy), then the underside.
+                b.FlatTri(p0, p1, apex, snow != null && i % 2 == 0 ? snowUv : uv, centre - new Vector3(0, 0.5f, 0));
+                b.FlatTri(p0, p1, centre, under, apex + new Vector3(0, 1, 0));
+            }
+        }
+
+        /// <summary>
+        /// A jagged mountain massif: a noisy cone with a ragged ridge, rock faces below the
+        /// snow line and snow above, all hazed towards <paramref name="haze"/> with distance.
+        /// </summary>
+        public static void Massif(MeshBuilder b, Vector3 baseCentre, float radius, float height, Color rock, Color snowC, Color haze, float hazeAmt, float snowLine, System.Random r)
+        {
+            const int rings = 6, sides = 12;
+            var pts = new Vector3[(rings + 1) * sides];
+            float twist = (float)r.NextDouble() * 6;
+            var tip = baseCentre + new Vector3(((float)r.NextDouble() - 0.5f) * radius * 0.2f, height, ((float)r.NextDouble() - 0.5f) * radius * 0.2f);
+            for (int k = 0; k <= rings; k++)
+            {
+                float f = k / (float)rings; // 0 = top ring, 1 = base
+                for (int i = 0; i < sides; i++)
+                {
+                    float a = i / (float)sides * Mathf.PI * 2 + twist;
+                    float jag = 0.7f + (float)r.NextDouble() * 0.6f;
+                    float rad = radius * Mathf.Pow(f, 0.85f) * jag;
+                    float y = height * (1 - Mathf.Pow(f, 0.7f)) * (0.85f + (float)r.NextDouble() * 0.3f);
+                    if (k == 0) rad = 0;
+                    var p = new Vector3(baseCentre.x + Mathf.Cos(a) * rad, baseCentre.y + y, baseCentre.z + Mathf.Sin(a) * rad);
+                    pts[k * sides + i] = k == 0 ? tip : p;
+                }
+            }
+            Vector2 FaceUv(Vector3 p0, Vector3 p1, Vector3 p2)
+            {
+                float hy = ((p0.y + p1.y + p2.y) / 3 - baseCentre.y) / height;
+                var n = Vector3.Cross(p1 - p0, p2 - p0).normalized;
+                float up = Mathf.Abs(n.y);
+                float line = snowLine + ((float)r.NextDouble() - 0.5f) * 0.12f;
+                bool snowy = hy > line || (hy > line - 0.18f && up > 0.75f);
+                var c = snowy ? snowC : Color.Lerp(rock, rock.Darken(0.25f), (float)r.NextDouble() * 0.5f);
+                // Aerial perspective.
+                c = Color.Lerp(c, haze, hazeAmt * (snowy ? 0.7f : 1f));
+                return Palette.Uv(c);
+            }
+            for (int k = 0; k < rings; k++)
+            for (int i = 0; i < sides; i++)
+            {
+                int i1 = (i + 1) % sides;
+                var p00 = pts[k * sides + i];
+                var p01 = pts[k * sides + i1];
+                var p10 = pts[(k + 1) * sides + i];
+                var p11 = pts[(k + 1) * sides + i1];
+                if (k > 0) b.FlatTri(p00, p01, p11, FaceUv(p00, p01, p11), baseCentre);
+                b.FlatTri(p00, p11, p10, FaceUv(p00, p11, p10), baseCentre);
+            }
         }
 
         /// <summary>Broadleaf tree: trunk and a few faceted canopy blobs.</summary>
@@ -92,6 +172,22 @@ namespace FRF
                 b.Cylinder(new Vector3(0, y, 0), elbow, rad * 0.6f, rad * 0.6f, 6, c, false);
                 b.Cylinder(elbow, elbow + new Vector3(0, h * 0.28f, 0), rad * 0.62f, rad * 0.5f, 6, c, true);
             }
+            b.Xf = Matrix4x4.identity;
+        }
+
+        /// <summary>Boulder for the photo rock material (UV-mapped instead of palette-coloured).</summary>
+        public static void BoulderTex(MeshBuilder b, Vector3 at, float size, System.Random r, float flat = 0.75f)
+        {
+            Place(b, at, (float)r.NextDouble() * 360);
+            b.RockTex(new Vector3(0, size * 0.3f, 0), new Vector3(size * (0.9f + (float)r.NextDouble() * 0.4f), size * flat, size), r.Next());
+            b.Xf = Matrix4x4.identity;
+        }
+
+        /// <summary>Rock obstacle on the trail for the photo rock material, matching its physics box.</summary>
+        public static void ObstacleRockTex(MeshBuilder b, Vector3 at, float yawDeg, Obstacle o)
+        {
+            Place(b, at, yawDeg + o.Yaw * Mathf.Rad2Deg);
+            b.RockTex(new Vector3(0, o.H * 0.42f, 0), new Vector3(o.HalfX * 1.05f, o.H * 0.62f, o.HalfS * 1.05f), o.Seed);
             b.Xf = Matrix4x4.identity;
         }
 

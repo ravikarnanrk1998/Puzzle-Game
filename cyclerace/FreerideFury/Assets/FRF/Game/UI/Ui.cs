@@ -387,17 +387,19 @@ namespace FRF
         /// </summary>
         public static Button Button(Transform parent, string label, Color a, Color b, Action onClick, float fontSize = 24, string subtitle = null, int radius = 14)
         {
-            // Outer glow behind the button
-            var glowNode = Node(parent, "BtnGlow");
+            var bg = Panel(parent, a, radius, "Button", Color.Lerp(a, Color.white, 0.45f));
+            var rt = (RectTransform)bg.transform;
+            var fill = rt.Find("Fill").GetComponent<Image>();
+
+            // Outer glow: a child stretched a little past the button, so it follows wherever the
+            // caller places the button (a sibling would sit unpositioned at the screen centre).
+            var glowNode = Node(rt, "BtnGlow").Fill(-5, -5, -5, -5);
+            glowNode.SetAsFirstSibling();
             var glowImg = glowNode.gameObject.AddComponent<Image>();
             glowImg.sprite = Round(radius + 4);
             glowImg.type = Image.Type.Sliced;
             glowImg.color = a.WithA(0.18f);
             glowImg.raycastTarget = false;
-
-            var bg = Panel(parent, a, radius, "Button", Color.Lerp(a, Color.white, 0.45f));
-            var rt = (RectTransform)bg.transform;
-            var fill = rt.Find("Fill").GetComponent<Image>();
 
             // Richer gradient: mid-point blend of a→b
             fill.color = Color.Lerp(a, b, 0.35f);
@@ -439,7 +441,6 @@ namespace FRF
                 onClick?.Invoke();
             });
             bg.gameObject.AddComponent<PressScale>();
-            glowNode.SetSiblingIndex(rt.GetSiblingIndex());   // keep glow behind button
             return btn;
         }
 

@@ -118,6 +118,25 @@ namespace FRF
             return edgeY + hill + bumps + big;
         }
 
+        /// <summary>Valley lake beyond the end of the course (forest, autumn and glacier mountains).</summary>
+        public bool HasLake => Track.Theme.Biome == Biome.Forest || Track.Theme.Biome == Biome.Autumn || Track.Theme.Biome == Biome.Glacier;
+
+        public float LakeY => Track.Y[Track.N - 1] - 7;
+        public const float LakeStart = 150;
+
+        /// <summary>How deep the lake basin cuts in at a point (0 outside it).</summary>
+        float Basin(float wx, float wz)
+        {
+            if (!HasLake) return 0;
+            var end = Track.Pos[Track.N - 1];
+            float h = Track.Head[Track.N - 1];
+            float dx = wx - end.x, dz = wz - end.z;
+            float ahead = dx * Mathf.Sin(h) + dz * Mathf.Cos(h);
+            float side = Mathf.Abs(dx * Mathf.Cos(h) - dz * Mathf.Sin(h));
+            float shore = (Tex.Fbm(wx * 0.01f + 5, wz * 0.01f, 3) - 0.5f) * 120;
+            return Tex.SmoothStep(LakeStart, LakeStart + 140, ahead + shore) * (1 - Tex.SmoothStep(260, 480, side + shore)) * 26;
+        }
+
         void Heights()
         {
             MinY = float.MaxValue;
@@ -127,6 +146,8 @@ namespace FRF
             {
                 int k = j * Nx + i;
                 float y = Profile(X0 + i * Cell, Z0 + j * Cell, S[k], Lat[k]);
+                float basin = Basin(X0 + i * Cell, Z0 + j * Cell);
+                if (basin > 0) y = Mathf.Min(y, Mathf.Lerp(y, LakeY - 10, basin / 26f));
                 H[k] = y;
                 MinY = Mathf.Min(MinY, y);
                 MaxY = Mathf.Max(MaxY, y);

@@ -188,6 +188,55 @@ namespace FRF
             }
         }
 
+        /// <summary>
+        /// Lumpy boulder for a photo rock material: same shape as <see cref="Rock"/>, but each face
+        /// gets world-space planar UVs on the axis it faces most (a per-face triplanar), so the
+        /// texture keeps its real scale (<paramref name="metresPerTile"/>) on any size of rock.
+        /// </summary>
+        public void RockTex(Vector3 c, Vector3 size, int seed, float metresPerTile = 1.8f, int detail = 1)
+        {
+            var rnd = new System.Random(seed);
+            int lat = 3 + detail, lon = 5 + detail * 2;
+            var pts = new Vector3[(lat + 1) * lon];
+            for (int i = 0; i <= lat; i++)
+            {
+                float v = i / (float)lat;
+                float phi = Mathf.PI * (v - 0.5f);
+                for (int j = 0; j < lon; j++)
+                {
+                    float th = j / (float)lon * Mathf.PI * 2 + (i % 2) * 0.4f;
+                    float jit = 0.78f + (float)rnd.NextDouble() * 0.38f;
+                    var p = new Vector3(Mathf.Cos(phi) * Mathf.Cos(th), Mathf.Sin(phi), Mathf.Cos(phi) * Mathf.Sin(th)) * jit;
+                    if (i == 0) p = new Vector3(0, -0.85f, 0);
+                    if (i == lat) p = new Vector3(0, 0.75f + (float)rnd.NextDouble() * 0.2f, 0);
+                    if (p.y < -0.35f) p.y = -0.35f - (p.y + 0.35f) * 0.25f;
+                    pts[i * lon + j] = P(c + Vector3.Scale(p, size));
+                }
+            }
+            var centre = P(c);
+            float k = 1f / metresPerTile;
+            void Face(Vector3 a, Vector3 b, Vector3 d)
+            {
+                var n = Vector3.Cross(b - a, d - a);
+                if (Vector3.Dot(n, (a + b + d) / 3 - centre) < 0) n = -n;
+                float ax = Mathf.Abs(n.x), ay = Mathf.Abs(n.y), az = Mathf.Abs(n.z);
+                Vector2 Uv(Vector3 q) => ay >= ax && ay >= az ? new Vector2(q.x, q.z) * k : ax >= az ? new Vector2(q.z, q.y) * k : new Vector2(q.x, q.y) * k;
+                int ia = Add(a, Uv(a)), ib = Add(b, Uv(b)), ic = Add(d, Uv(d));
+                Tri(ia, ib, ic, n);
+            }
+            for (int i = 0; i < lat; i++)
+            for (int j = 0; j < lon; j++)
+            {
+                int j1 = (j + 1) % lon;
+                var p00 = pts[i * lon + j];
+                var p01 = pts[i * lon + j1];
+                var p10 = pts[(i + 1) * lon + j];
+                var p11 = pts[(i + 1) * lon + j1];
+                if (i > 0) Face(p00, p01, p11);
+                if (i < lat - 1) Face(p00, p11, p10);
+            }
+        }
+
         /// <summary>Copies another builder's geometry through <see cref="Xf"/>.</summary>
         public void Append(MeshBuilder other)
         {

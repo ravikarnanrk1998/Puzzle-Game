@@ -105,6 +105,86 @@ namespace FRF
             px.Fill((x, y) => Px.InPoly(p, x, y), Color.white);
         });
 
+        /// <summary>Skull (takedowns).</summary>
+        public static Sprite Skull => Get("skull", 96, px => px.Fill((x, y) =>
+        {
+            bool head = InCircle(x, y, 0.5f, 0.57f, 0.34f) || (x > 0.31f && x < 0.69f && y > 0.17f && y < 0.45f);
+            if (!head) return false;
+            if (InCircle(x, y, 0.37f, 0.55f, 0.09f) || InCircle(x, y, 0.63f, 0.55f, 0.09f)) return false;
+            if (Px.InPoly(new[] { V(0.5f, 0.46f), V(0.45f, 0.37f), V(0.55f, 0.37f) }, x, y)) return false;
+            if (y < 0.29f && (Mathf.Abs(x - 0.44f) < 0.02f || Mathf.Abs(x - 0.56f) < 0.02f)) return false;
+            return true;
+        }, Color.white));
+
+        static float SegDist(float x, float y, Vector2 a, Vector2 b)
+        {
+            var p = V(x, y);
+            var ab = b - a;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+            return Vector2.Distance(p, a + ab * t);
+        }
+
+        /// <summary>Stopwatch (race timer).</summary>
+        public static Sprite Stopwatch => Get("watch", 96, px => px.Fill((x, y) =>
+        {
+            float d = Mathf.Sqrt((x - 0.5f) * (x - 0.5f) + (y - 0.44f) * (y - 0.44f));
+            if (d < 0.38f && d > 0.29f) return true;
+            if (x > 0.44f && x < 0.56f && y > 0.8f && y < 0.9f) return true;
+            if (x > 0.36f && x < 0.64f && y > 0.88f && y < 0.95f) return true;
+            if (SegDist(x, y, V(0.5f, 0.44f), V(0.62f, 0.58f)) < 0.045f) return true;
+            return InCircle(x, y, 0.5f, 0.44f, 0.06f);
+        }, Color.white));
+
+        /// <summary>Drilled brake rotor.</summary>
+        public static Sprite BrakeDisc => Get("disc", 96, px => px.Fill((x, y) =>
+        {
+            float d = Mathf.Sqrt((x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f));
+            if (d < 0.135f) return d > 0.055f;
+            if (d > 0.44f || d < 0.2f) return false;
+            for (int i = 0; i < 8; i++)
+            {
+                float a = i / 8f * Mathf.PI * 2;
+                if (InCircle(x, y, 0.5f + Mathf.Cos(a) * 0.33f, 0.5f + Mathf.Sin(a) * 0.33f, 0.045f)) return false;
+            }
+            return true;
+        }, Color.white));
+
+        /// <summary>Small downward pointer under rival name tags.</summary>
+        public static Sprite Pointer => Get("pointer", 32, px =>
+        {
+            var p = new[] { V(0.1f, 0.9f), V(0.9f, 0.9f), V(0.5f, 0.15f) };
+            px.Fill((x, y) => Px.InPoly(p, x, y), Color.white);
+        });
+
+        /// <summary>
+        /// Speed gauge ring coloured green to yellow to orange to red along the 270-degree sweep
+        /// (in sprite space: clockwise from 6 o'clock), for a radial fill from the bottom.
+        /// </summary>
+        public static Sprite GaugeRing => Get("gauge", 160, px =>
+        {
+            var stops = new[] { (0f, Mats.Hex(0x3BD16F)), (0.4f, Mats.Hex(0xFFD23A)), (0.7f, Mats.Hex(0xFF8A1A)), (1f, Mats.Hex(0xFF3B3B)) };
+            for (int y = 0; y < 160; y++)
+            for (int x = 0; x < 160; x++)
+            {
+                float dx = (x + 0.5f) / 80 - 1, dy = (y + 0.5f) / 80 - 1;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                float a = Mathf.Clamp01((1 - d) * 80) * Mathf.Clamp01((d - 0.8f) * 80);
+                if (a <= 0) continue;
+                float th = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+                float phi = Mathf.Repeat(-90 - th, 360);
+                float t = Mathf.Clamp01(phi / 270f);
+                var c = stops[stops.Length - 1].Item2;
+                for (int k = 0; k < stops.Length - 1; k++)
+                    if (t <= stops[k + 1].Item1)
+                    {
+                        c = Color.Lerp(stops[k].Item2, stops[k + 1].Item2, (t - stops[k].Item1) / (stops[k + 1].Item1 - stops[k].Item1));
+                        break;
+                    }
+                c.a = a;
+                px.P[y * 160 + x] = c;
+            }
+        });
+
         /// <summary>Chequered finish flag (full colour).</summary>
         public static Sprite Flag => Get("flag", 64, px =>
         {

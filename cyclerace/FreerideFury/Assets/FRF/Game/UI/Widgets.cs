@@ -159,7 +159,9 @@ namespace FRF
     public sealed class SteerPad : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
     {
         // Premium dark glass with slight blue tint
-        static readonly Color Idle    = new Color(0.03f, 0.05f, 0.09f, 0.62f);
+        // Dark glass; the white border image sits under the fill, so the fill stays nearly opaque.
+        static readonly Color Idle    = new Color(0.02f, 0.03f, 0.06f, 0.9f);
+        static readonly Color Rim     = new Color(1, 1, 1, 0.3f);
         static readonly Color Active  = Pal.Orange;
 
         readonly Dictionary<int, float> _touches = new Dictionary<int, float>();
@@ -208,7 +210,7 @@ namespace FRF
             shadow.rectTransform.At(dir < 0 ? 0 : 1, 0.5f, 0, -4, w, h);
 
             // Border + fill panel
-            k.Border = Ui.Panel(root, Idle, 26, dir < 0 ? "Left" : "Right", Color.white.WithA(0.40f));
+            k.Border = Ui.Panel(root, Idle, 26, dir < 0 ? "Left" : "Right", Rim);
             k.Border.raycastTarget = false;
             k.Rt = k.Border.rectTransform;
             k.Rt.At(dir < 0 ? 0 : 1, 0.5f, 0, 0, w, h);
@@ -258,7 +260,7 @@ namespace FRF
             k.On = on;
             // Neon orange fill when active, deep glass when idle
             k.Fill.color   = on ? Active.WithA(0.90f) : Idle;
-            k.Border.color = on ? Pal.Orange.WithA(0.80f) : Color.white.WithA(0.38f);
+            k.Border.color = on ? Pal.Orange.WithA(0.80f) : Rim;
             k.Arrow.color  = on ? Color.white : Color.white.WithA(0.60f);
         }
     }

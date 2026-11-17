@@ -1,0 +1,12 @@
+Photographic assets from Poly Haven (https://polyhaven.com), licensed CC0 (public domain).
+Attribution is not required; credited here anyway.
+
+Skies (HDRIs, 4K source; the game ships tone-mapped 4096x2048 JPGs baked from them):
+  alps_field, valley_of_desolation, autumn_hill_view, lago_disola, klippad_sunrise_2
+
+Textures (2K diffuse + OpenGL normal maps):
+  rocky_trail, gravelly_sand, snow_02, rock_ground, aerial_grass_rock, rock_boulder_dry
+
+The HDR files in Art/HDRI are editor-only sources and are not included in builds.
+FRF > 1. Setup Project (BuildTools.ImportArt) bakes Resources/Skies/*.jpg + *.txt and the
+*_detail.png maps from them.

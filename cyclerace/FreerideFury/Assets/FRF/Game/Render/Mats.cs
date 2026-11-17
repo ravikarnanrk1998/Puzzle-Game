@@ -56,6 +56,29 @@ namespace FRF
         public static Material AdditiveBase => Base("FRF_Additive", "Universal Render Pipeline/Unlit");
         public static Material ParticleAlphaBase => Base("FRF_ParticleAlpha", "Universal Render Pipeline/Particles/Unlit");
         public static Material ParticleAddBase => Base("FRF_ParticleAdd", "Universal Render Pipeline/Particles/Unlit");
+        public static Material CloudsBase => Base("FRF_Clouds", "FRF/SkyClouds");
+        public static Material LitNormalBase => Base("FRF_LitNormal", "Universal Render Pipeline/Lit");
+        public static Material SkyPanoBase => Base("FRF_SkyPano", "Skybox/Panoramic");
+
+        /// <summary>Photo surface with a normal map (trail, rocks). Meshes using it need tangents.</summary>
+        public static Material LitNormal(Texture albedo, Texture normal, Color tint, float smooth = 0.12f, float bump = 1f)
+        {
+            var m = new Material(LitNormalBase);
+            m.SetColor(BaseColor, tint);
+            m.color = tint;
+            m.SetTexture(BaseMap, albedo);
+            m.mainTexture = albedo;
+            m.SetFloat(Smoothness, smooth);
+            m.SetFloat(Metallic, 0);
+            if (normal != null)
+            {
+                m.SetTexture("_BumpMap", normal);
+                m.SetFloat("_BumpScale", bump);
+                m.EnableKeyword("_NORMALMAP");
+            }
+            m.enableInstancing = true;
+            return m;
+        }
 
         /// <summary>Opaque lit surface.</summary>
         public static Material Lit(Color c, float smooth = 0.25f, Texture tex = null, bool doubleSided = false, float metallic = 0, Color? emission = null)
@@ -84,7 +107,7 @@ namespace FRF
         }
 
         /// <summary>Terrain: a baked colour map over the whole area plus a tiled grain detail map.</summary>
-        public static Material Terrain(Texture colorMap, Texture detail, Vector2 detailTiling, float smooth = 0.08f)
+        public static Material Terrain(Texture colorMap, Texture detail, Vector2 detailTiling, float smooth = 0.08f, Texture detailNormal = null)
         {
             var m = new Material(LitDetailBase);
             m.SetColor(BaseColor, Color.white);
@@ -96,6 +119,11 @@ namespace FRF
             m.SetTexture("_DetailAlbedoMap", detail);
             m.SetTextureScale("_DetailAlbedoMap", detailTiling);
             m.SetFloat("_DetailAlbedoMapScale", 1);
+            if (detailNormal != null)
+            {
+                m.SetTexture("_DetailNormalMap", detailNormal);
+                m.SetFloat("_DetailNormalMapScale", 1);
+            }
             return m;
         }
 

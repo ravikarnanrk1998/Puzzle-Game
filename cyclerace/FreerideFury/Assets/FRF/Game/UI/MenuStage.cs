@@ -109,15 +109,15 @@ namespace FRF
                 }
             }
             // Distant peaks.
-            for (int k = 0; k < 18; k++)
+            int ring = Art.Sky(th.Sky) != null ? 0 : 18;
+            for (int k = 0; k < ring; k++)
             {
                 float a = k / 18f * Mathf.PI * 2;
                 float r = 650 + (float)rnd.NextDouble() * 350;
                 var p = new Vector3(Mathf.Cos(a) * r, -30, Mathf.Sin(a) * r);
-                float hh = 220 + (float)rnd.NextDouble() * 260;
-                var tip = p + Vector3.up * hh;
-                b.Cylinder(p, tip, 200 + (float)rnd.NextDouble() * 160, 0, 7, th.MountainFar, false, a);
-                b.Cylinder(Vector3.Lerp(p, tip, 0.66f), tip + Vector3.up, 70, 0, 7, th.MountainCap, false, a);
+                float hh = 260 + (float)rnd.NextDouble() * 320;
+                var rock = Color.Lerp(th.Rock, th.MountainFar, 0.45f);
+                Props.Massif(b, p, 220 + (float)rnd.NextDouble() * 160, hh, rock, th.MountainCap, th.Fog, 0.35f, th.Biome == Biome.Glacier ? 0.35f : 0.55f, rnd);
             }
             // The deck.
             // Wooden deck with an orange rim showing around its edge.

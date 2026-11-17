@@ -1,0 +1,28 @@
+{
+    "name": "UA.Billing",
+    "rootNamespace": "UA.Billing",
+    "references": [
+        "UA.Core",
+        "UA.Game",
+        "Unity.Purchasing",
+        "Unity.Purchasing.Stores",
+        "Unity.Purchasing.Security",
+        "Unity.Purchasing.SecurityStub",
+        "Unity.Purchasing.SecurityCore"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.purchasing",
+            "expression": "5.0.0",
+            "define": "UA_IAP"
+        }
+    ],
+    "noEngineReferences": false
+}

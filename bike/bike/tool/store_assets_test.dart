@@ -3,10 +3,12 @@
 //   flutter test tool/store_assets_test.dart
 //   flutter pub run flutter_launcher_icons
 //
-// Output: assets/icon/*.png (launcher icon sources) and store_listing/*.png.
+// Output: assets/icon/*.png (launcher icon sources, made from the logo in
+// assets/icon/logo_source.png) and store_listing/*.png.
 // The screenshots are numbered in the order to upload them.
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:bike/game/bike_art.dart';
@@ -26,18 +28,21 @@ void main() {
   setUpAll(loadFonts);
 
   test('app icon', () async {
+    final logo = await _loadLogo();
+    final art = await _logoArtwork(logo);
     const full = Size(1024, 1024);
-    await _save('assets/icon/icon.png', full, (c, s) {
-      _iconBackground(c, s);
-      _iconBike(c, s);
-    });
-    await _save('assets/icon/icon_background.png', full, _iconBackground);
-    await _save('assets/icon/icon_foreground.png', full, _iconBike);
-    await _save('store_listing/icon_512.png', const Size(512, 512), (c, s) {
-      c.scale(0.5);
-      _iconBackground(c, full);
-      _iconBike(c, full);
-    });
+    // Phones and Google Play round off the corners of the full icon, which
+    // leaves the picture whole.
+    await _save('assets/icon/icon.png', full,
+        (c, s) => _paintFullLogo(c, s, logo));
+    await _save('store_listing/icon_512.png', const Size(512, 512),
+        (c, s) => _paintFullLogo(c, s, logo));
+    // An adaptive icon's mask shows only the middle of it, as a circle or
+    // other shape, so the picture is smaller there to keep the words in.
+    // It is all in the background layer, with nothing in front.
+    await _save('assets/icon/icon_background.png', full,
+        (c, s) => _paintLogo(c, s, art, 0.58));
+    await _save('assets/icon/icon_foreground.png', full, (c, s) {});
   });
 
   test('feature graphic', () async {
@@ -186,58 +191,79 @@ Future<void> _save(String path, Size size, void Function(Canvas, Size) draw,
 
 // ------------------------------------------------------------------- art
 
-void _iconBackground(Canvas c, Size s) {
-  final rect = Offset.zero & s;
-  c.drawRect(
-    rect,
-    Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFFFB300), Color(0xFFFF3D00)],
-      ).createShader(rect),
-  );
-  final roadW = s.width * 0.46;
-  final left = (s.width - roadW) / 2;
-  const curb = 34.0;
-  final white = Paint()..color = Colors.white;
-  final red = Paint()..color = const Color(0xFFE53935);
-  c.drawRect(Rect.fromLTWH(left - curb, 0, curb, s.height), white);
-  c.drawRect(Rect.fromLTWH(left + roadW, 0, curb, s.height), white);
-  for (var y = 0.0; y < s.height; y += 120) {
-    c.drawRect(Rect.fromLTWH(left - curb, y, curb, 60), red);
-    c.drawRect(Rect.fromLTWH(left + roadW, y, curb, 60), red);
-  }
-  c.drawRect(Rect.fromLTWH(left, 0, roadW, s.height),
-      Paint()..color = const Color(0xFF3D4049));
-  final dash = Paint()..color = const Color(0xE6FFFFFF);
-  for (var y = -40.0; y < s.height; y += 150) {
-    c.drawRRect(
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(s.width / 2 - 9, y, 18, 80), const Radius.circular(6)),
-      dash,
-    );
-  }
-  final speed = Paint()
-    ..color = const Color(0x66FFFFFF)
-    ..strokeWidth = 10
-    ..strokeCap = StrokeCap.round;
-  final rng = Random(7);
-  for (var i = 0; i < 10; i++) {
-    final side = i.isEven ? -1 : 1;
-    final x = s.width / 2 + side * (roadW / 2 + curb + 40 + rng.nextDouble() * 110);
-    final y = rng.nextDouble() * s.height;
-    c.drawLine(Offset(x, y), Offset(x, y + 90 + rng.nextDouble() * 80), speed);
-  }
+/// The logo the icons are made from.
+const _logoPath = 'assets/icon/logo_source.png';
+
+/// The square of the logo that holds its whole picture: inside the rounded
+/// frame, which the launcher's own mask takes the place of, and clear of
+/// the mark in the corner outside it.
+const _logoArt = Rect.fromLTWH(57, 50, 735, 735);
+
+/// The inside of the logo's rounded frame, as a square: left and right it
+/// reaches a little way under the frame, top and bottom it stops at it.
+const _logoInside = Rect.fromLTWH(22, 14, 806, 806);
+
+Future<ui.Image> _loadLogo() async {
+  final codec =
+      await ui.instantiateImageCodec(File(_logoPath).readAsBytesSync());
+  return (await codec.getNextFrame()).image;
 }
 
-void _iconBike(Canvas c, Size s) {
+/// Fills the square with the inside of the [logo]'s frame, at full size.
+/// Where the frame curves in at the corners, the picture's own colours
+/// there carry on instead.
+void _paintFullLogo(Canvas c, Size s, ui.Image logo) {
+  final all = Offset.zero & s;
+  c.drawRect(
+    all,
+    Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF285486), Color(0xFF1A2B59)],
+      ).createShader(all),
+  );
+  // The inside of the frame, a few pixels in from it: 821 x 806 with
+  // corners of radius 116 in the logo.
+  final k = s.width / _logoInside.width;
   c.save();
-  c.translate(s.width / 2, s.height / 2);
-  c.rotate(-0.12);
-  c.scale(s.width / 1024 * 9.5);
-  paintRide(c, Catalog.bikes.first);
+  c.clipRRect(RRect.fromRectAndRadius(
+    Rect.fromLTRB(-8 * k, 3 * k, s.width + 7 * k, s.height - 3 * k),
+    Radius.circular(113 * k),
+  ));
+  c.drawImageRect(
+      logo, _logoInside, all, Paint()..filterQuality = FilterQuality.high);
   c.restore();
+}
+
+/// The picture in the [logo], cut out of its frame.
+Future<ui.Image> _logoArtwork(ui.Image logo) async {
+  final recorder = ui.PictureRecorder();
+  Canvas(recorder).drawImageRect(logo, _logoArt, Offset.zero & _logoArt.size,
+      Paint()..filterQuality = FilterQuality.high);
+  return recorder
+      .endRecording()
+      .toImage(_logoArt.width.round(), _logoArt.height.round());
+}
+
+/// Draws [art] in the middle of the icon, [scale] times its width. The
+/// colours at the art's edges carry on out to the icon's, so the square is
+/// filled without a seam.
+void _paintLogo(Canvas c, Size s, ui.Image art, double scale) {
+  final side = s.width * scale;
+  final k = side / art.width;
+  final matrix = Float64List.fromList([
+    k, 0, 0, 0, //
+    0, k, 0, 0,
+    0, 0, 1, 0,
+    (s.width - side) / 2, (s.height - side) / 2, 0, 1,
+  ]);
+  c.drawRect(
+    Offset.zero & s,
+    Paint()
+      ..shader = ui.ImageShader(art, TileMode.clamp, TileMode.clamp, matrix,
+          filterQuality: FilterQuality.high),
+  );
 }
 
 void _featureGraphic(Canvas c, Size s) {
